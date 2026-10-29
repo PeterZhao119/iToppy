@@ -1,4 +1,4 @@
-import type { SourceInstanceSnapshot, TaskSnapshot } from "../core/agents/model.js";
+import type { NavigationTarget, SourceInstanceSnapshot, TaskSnapshot } from "../core/agents/model.js";
 import { resolveAnimation } from "../core/characters/animation-resolver.js";
 import type { CharacterDefinition } from "../core/characters/model.js";
 import type {
@@ -9,6 +9,22 @@ import { statusIcon } from "./status-icons.js";
 
 type IdleBehavior = "none" | "walk_left" | "walk_right" | "idle_adjust_skirt" | "idle_tail_cuddle";
 
+export interface OffsetBounds {
+  minX: number;
+  maxX: number;
+  minY: number;
+  maxY: number;
+}
+
+export interface PetViewOptions {
+  onOpenTarget?: (navigation: NavigationTarget) => void;
+  onWalkStart?: () => void;
+  onMove?: (offsetX: number, offsetY: number) => void;
+  onDragStart?: (clientX: number, clientY: number) => void;
+  onDragEnd?: () => void;
+  getOffsetBounds?: () => OffsetBounds | undefined;
+}
+
 export class PetView {
   readonly element: HTMLElement;
   private readonly renderer: CharacterRenderer;
@@ -17,6 +33,7 @@ export class PetView {
   private readonly nameTag: HTMLElement;
   private readonly stateIcon: HTMLElement;
   private readonly name: HTMLElement;
+  private readonly workspaceName: HTMLElement;
   private readonly status: HTMLElement;
   private readonly sessions: HTMLElement;
   private readonly health: HTMLElement;
@@ -29,11 +46,20 @@ export class PetView {
   private resultKey = "";
   private bubbleDismissed = false;
   private bubbleExpanded = false;
+  private bubbleForced = false;
   private idleBehavior: IdleBehavior = "none";
   private behaviorElapsed = 0;
   private nextBehaviorIn = randomBetween(2, 5);
   private offsetX = 0;
-  private walkTarget = 0;
+  private offsetY = 0;
+  private walkVelocityX = 0;
+  private walkVelocityY = 0;
+  private walkDuration = 0;
+  private draggingActive = false;
+  private runningAnimation: string | undefined;
+  private runningActivityKey = "";
+  private runningElapsed = 0;
+  private runningDuration = 0;
 
   constructor(
     parent: HTMLElement,
@@ -41,6 +67,7 @@ export class PetView {
     private readonly definition: CharacterDefinition,
     packageUrl: string,
     rendererFactory: CharacterRendererFactory,
+    private readonly options: PetViewOptions = {},
   ) {
     this.snapshot = snapshot;
     this.element = document.createElement("article");
@@ -53,7 +80,10 @@ export class PetView {
       <div class="pet-stage">
         <div class="pet-nametag">
           <span class="status-icon" data-state-icon></span>
-          <span data-name></span>
+          <span class="nametag-copy">
+            <span data-agent-name></span>
+            <span data-workspace-name></span>
+          </span>
         </div>
         <canvas aria-label="Q 版桌宠"></canvas>
         <div class="bubble-wrap">
@@ -71,7 +101,8 @@ export class PetView {
 
     this.nameTag = required(this.element, ".pet-nametag");
     this.stateIcon = required(this.element, "[data-state-icon]");
-    this.name = required(this.element, ".pet-nametag [data-name]");
+    this.name = required(this.element, "[data-agent-name]");
+    this.workspaceName = required(this.element, "[data-workspace-name]");
     this.status = required(this.element, "[data-status]");
     this.sessions = required(this.element, "[data-sessions]");
     this.health = required(this.element, "[data-health]");
@@ -85,17 +116,74 @@ export class PetView {
     this.resultToggle.addEventListener("click", () => {
       this.bubbleExpanded = !this.bubbleExpanded;
       this.bubbleDismissed = false;
+      this.bubbleForced = true;
       this.render();
     });
     bubbleClose.addEventListener("click", () => {
       this.bubbleDismissed = true;
       this.bubbleExpanded = false;
+      this.bubbleForced = false;
       this.render();
     });
-    this.bubble.addEventListener("click", () => {
-      const workspacePath = this.snapshot.instance.navigation.workspacePath;
-      if (workspacePath !== undefined) window.location.href = vscodeWorkspaceUrl(workspacePath);
-    });
+    this.bubble.addEventListener("click", () => this.openTarget());
+    if (this.options.onDragStart !== undefined) {
+      this.canvas.addEventListener("pointerdown", (event) => {
+        if (event.button !== 0) return;
+        this.canvas.setPointerCapture(event.pointerId);
+        this.draggingActive = true;
+        this.stopIdleBehavior();
+        this.applyAnimation();
+        this.options.onDragStart?.(event.screenX, event.screenY);
+        event.preventDefault();
+      });
+      this.nameTag.addEventListener("pointerdown", (downEvent) => {
+        if (downEvent.button !== 0) return;
+        let started = false;
+        const startX = downEvent.clientX;
+        const startY = downEvent.clientY;
+        const startDrag = (event: PointerEvent): void => {
+          if (started) return;
+          started = true;
+          this.draggingActive = true;
+          this.stopIdleBehavior();
+          this.applyAnimation();
+          this.options.onDragStart?.(event.screenX, event.screenY);
+        };
+        const timer = window.setTimeout(() => startDrag(downEvent), 350);
+        const move = (event: PointerEvent): void => {
+          if (!started && Math.hypot(event.clientX - startX, event.clientY - startY) > 5) {
+            window.clearTimeout(timer);
+            startDrag(event);
+          }
+        };
+        const finish = (event: PointerEvent, cancelled = false): void => {
+          window.clearTimeout(timer);
+          window.removeEventListener("pointermove", move);
+          window.removeEventListener("pointerup", finish);
+          window.removeEventListener("pointercancel", cancel);
+          if (started) {
+            if (cancelled) {
+              this.draggingActive = false;
+              this.applyAnimation();
+              this.options.onDragEnd?.();
+            }
+            return;
+          }
+          if (!cancelled && event.type === "pointerup") this.openTarget();
+        };
+        const cancel = (event: PointerEvent): void => finish(event, true);
+        window.addEventListener("pointermove", move);
+        window.addEventListener("pointerup", finish);
+        window.addEventListener("pointercancel", cancel);
+        downEvent.preventDefault();
+      });
+      window.addEventListener("pointerup", () => {
+        if (!this.draggingActive) return;
+        this.draggingActive = false;
+        this.applyAnimation();
+        this.options.onDragEnd?.();
+      });
+    }
 
     this.renderer = rendererFactory(this.canvas);
     void this.renderer.load(definition, packageUrl).then(() => {
@@ -112,9 +200,27 @@ export class PetView {
     this.render();
   }
 
+  openLatestResult(): void {
+    this.bubbleDismissed = false;
+    this.bubbleExpanded = true;
+    this.bubbleForced = true;
+    this.render();
+    this.openTarget();
+  }
+
+  private openTarget(): void {
+    const navigation = this.snapshot.instance.navigation;
+    if (this.options.onOpenTarget !== undefined) {
+      this.options.onOpenTarget(navigation);
+    } else if (navigation.workspacePath !== undefined) {
+      window.location.href = vscodeWorkspaceUrl(navigation.workspacePath);
+    }
+  }
+
   tick(deltaSeconds: number): void {
     if (!this.loaded) return;
     this.updateIdleBehavior(deltaSeconds);
+    this.updateRunningPerformance(deltaSeconds);
     this.applyAnimation();
     this.renderer.update(deltaSeconds);
   }
@@ -135,13 +241,16 @@ export class PetView {
       this.resultKey = nextResultKey;
       this.bubbleDismissed = false;
       this.bubbleExpanded = false;
+      this.bubbleForced = false;
     }
     if (!isIdleState(state)) this.stopIdleBehavior();
 
     this.element.dataset.state = state;
     this.element.dataset.activity = primary?.activity ?? "generic";
-    this.name.textContent = this.snapshot.instance.displayName;
-    this.name.title = this.snapshot.instance.displayName;
+    const [agentName, ...workspaceParts] = this.snapshot.instance.displayName.split(" · ");
+    this.name.textContent = agentName ?? this.snapshot.instance.displayName;
+    this.workspaceName.textContent = workspaceParts.join(" · ");
+    this.nameTag.title = this.snapshot.instance.displayName;
     this.stateIcon.innerHTML = statusIcon(primary);
     this.status.textContent = statusLabel(primary, this.snapshot.runningCount);
     this.sessions.textContent = sessionLabel(this.snapshot.sessionCount, this.snapshot.runningCount);
@@ -154,14 +263,13 @@ export class PetView {
     const isResult = ["succeeded", "failed", "succeeded_idle", "failed_idle"].includes(state);
     const isFresh = state === "succeeded" || state === "failed";
     const showBubble = response !== "" && !this.bubbleDismissed && (
-      isRunning || (isResult && this.snapshot.settings.resultBubbleEnabled)
+      isRunning || (isResult && (this.bubbleForced || this.snapshot.settings.resultBubbleEnabled))
     );
     this.element.classList.toggle("has-bubble", showBubble);
     this.bubbleText.textContent = preview(response);
-    this.bubble.disabled = this.snapshot.instance.navigation.workspacePath === undefined;
-    this.bubble.title = this.bubble.disabled
-      ? "未识别工作区，无法跳转"
-      : "打开对应 VS Code 工作区";
+    this.bubble.disabled = this.options.onOpenTarget === undefined &&
+      this.snapshot.instance.navigation.workspacePath === undefined;
+    this.bubble.title = this.bubble.disabled ? "未识别跳转目标" : "打开对应应用";
     this.resultToggle.hidden = !isResult || response === "";
     this.resultToggle.textContent = state.startsWith("succeeded") ? "✓" : "!";
     this.resultToggle.setAttribute("aria-expanded", String(this.bubbleExpanded || isFresh));
@@ -173,33 +281,117 @@ export class PetView {
     const primary = this.snapshot.primary;
     const state = primary?.state ?? "idle";
     const activity = primary?.activity;
-    const key = `${state}:${activity ?? ""}:${this.idleBehavior}`;
+    const key = `${state}:${activity ?? ""}:${this.idleBehavior}:${this.draggingActive}:${this.runningAnimation ?? ""}`;
     if (key === this.animationKey) return;
     this.animationKey = key;
+    if (this.draggingActive) {
+      this.renderer.play("dragging");
+      return;
+    }
     if (this.idleBehavior !== "none") {
-      this.renderer.play(this.idleBehavior);
+      this.renderer.play(resolveAnimation(this.definition, { state: this.idleBehavior }));
+      return;
+    }
+    if (state === "running" && this.runningAnimation !== undefined) {
+      this.renderer.play(this.runningAnimation);
       return;
     }
     this.renderer.play(resolveAnimation(this.definition, { state, activity }));
   }
 
+  private updateRunningPerformance(deltaSeconds: number): void {
+    const primary = this.snapshot.primary;
+    if (primary?.state !== "running") {
+      this.runningAnimation = undefined;
+      this.runningActivityKey = "";
+      this.runningElapsed = 0;
+      return;
+    }
+
+    const activityKey = `${primary.sessionId}:${primary.activity}`;
+    if (activityKey !== this.runningActivityKey) {
+      this.runningActivityKey = activityKey;
+      this.runningAnimation = undefined;
+      this.runningElapsed = 0;
+      this.runningDuration = 0;
+    }
+    this.runningElapsed += deltaSeconds;
+    if (this.runningAnimation === undefined) {
+      this.runningAnimation = resolveAnimation(this.definition, {
+        state: "running",
+        activity: primary.activity,
+      });
+      this.runningDuration = randomBetween(2, 4);
+      return;
+    }
+    if (this.runningElapsed < this.runningDuration) return;
+
+    const actual = resolveAnimation(this.definition, { state: "running", activity: primary.activity });
+    const candidates = [
+      actual,
+      "running.thinking",
+      "running.tool_calling",
+      "running.searching",
+    ].filter((name, index, values) =>
+      name !== this.runningAnimation &&
+      this.definition.animations[name] !== undefined &&
+      values.indexOf(name) === index
+    );
+    const weighted = candidates.flatMap((name) => name === actual ? [name, name, name] : [name]);
+    if (weighted.length > 0) {
+      this.runningAnimation = weighted[Math.floor(Math.random() * weighted.length)] ?? actual;
+      this.runningDuration = randomBetween(2.5, 5);
+    }
+    this.runningElapsed = 0;
+  }
+
   private updateIdleBehavior(deltaSeconds: number): void {
+    if (this.draggingActive) return;
     const state = this.snapshot.primary?.state ?? "idle";
     if (!isIdleState(state)) return;
     this.behaviorElapsed += deltaSeconds;
 
     if (this.idleBehavior === "walk_left" || this.idleBehavior === "walk_right") {
-      const remaining = this.walkTarget - this.offsetX;
-      const speed = { slow: 35, standard: 55, fast: 85 }[this.snapshot.settings.walkSpeed];
-      const step = Math.sign(remaining) * speed * deltaSeconds;
-      if (Math.abs(step) >= Math.abs(remaining)) {
-        this.offsetX = this.walkTarget;
-        this.updatePosition();
-        this.finishIdleBehavior();
+      let deltaX = this.walkVelocityX * deltaSeconds;
+      let deltaY = this.walkVelocityY * deltaSeconds;
+      const offsetBounds = this.options.getOffsetBounds?.();
+      if (offsetBounds !== undefined) {
+        if (this.offsetX + deltaX < offsetBounds.minX) {
+          this.walkVelocityX = Math.abs(this.walkVelocityX);
+          deltaX = offsetBounds.minX - this.offsetX;
+        } else if (this.offsetX + deltaX > offsetBounds.maxX) {
+          this.walkVelocityX = -Math.abs(this.walkVelocityX);
+          deltaX = offsetBounds.maxX - this.offsetX;
+        }
+        if (this.offsetY + deltaY < offsetBounds.minY) {
+          this.walkVelocityY = Math.abs(this.walkVelocityY);
+          deltaY = offsetBounds.minY - this.offsetY;
+        } else if (this.offsetY + deltaY > offsetBounds.maxY) {
+          this.walkVelocityY = -Math.abs(this.walkVelocityY);
+          deltaY = offsetBounds.maxY - this.offsetY;
+        }
       } else {
-        this.offsetX += step;
-        this.updatePosition();
+        const rect = this.canvas.getBoundingClientRect();
+        if (rect.left + deltaX < 8) {
+          this.walkVelocityX = Math.abs(this.walkVelocityX);
+          deltaX = 8 - rect.left;
+        } else if (rect.right + deltaX > window.innerWidth - 8) {
+          this.walkVelocityX = -Math.abs(this.walkVelocityX);
+          deltaX = window.innerWidth - 8 - rect.right;
+        }
+        if (rect.top + deltaY < 8) {
+          this.walkVelocityY = Math.abs(this.walkVelocityY);
+          deltaY = 8 - rect.top;
+        } else if (rect.bottom + deltaY > window.innerHeight - 8) {
+          this.walkVelocityY = -Math.abs(this.walkVelocityY);
+          deltaY = window.innerHeight - 8 - rect.bottom;
+        }
       }
+      this.offsetX += deltaX;
+      this.offsetY += deltaY;
+      this.idleBehavior = this.walkVelocityX < 0 ? "walk_left" : "walk_right";
+      this.updatePosition();
+      if (this.behaviorElapsed >= this.walkDuration) this.finishIdleBehavior();
       return;
     }
 
@@ -216,7 +408,7 @@ export class PetView {
     const roll = Math.random();
     if (roll < 0.4) {
       if (this.snapshot.settings.walkEnabled && !window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-        this.startWalk(Math.random() < 0.5 ? -1 : 1);
+        this.startWalk();
       } else {
         this.finishIdleBehavior();
       }
@@ -229,32 +421,33 @@ export class PetView {
     }
   }
 
-  private startWalk(direction: -1 | 1): void {
+  private startWalk(): void {
     if (this.definition.animations.walk_left === undefined || this.definition.animations.walk_right === undefined) {
       this.finishIdleBehavior();
       return;
     }
-    const rect = this.canvas.getBoundingClientRect();
-    const center = rect.left + rect.width / 2;
-    const distance = window.innerWidth * 0.15;
-    const targetCenter = center + direction * distance;
-    const minCenter = rect.width / 2 + 8;
-    const maxCenter = window.innerWidth - rect.width / 2 - 8;
-    const clampedCenter = Math.min(maxCenter, Math.max(minCenter, targetCenter));
-    this.walkTarget = this.offsetX + clampedCenter - center;
-    if (Math.abs(this.walkTarget - this.offsetX) < 10) {
-      this.finishIdleBehavior();
-      return;
+    const speedRanges = {
+      slow: [25, 40],
+      standard: [45, 70],
+      fast: [70, 105],
+    } as const;
+    const [minimumSpeed, maximumSpeed] = speedRanges[this.snapshot.settings.walkSpeed];
+    const speed = randomBetween(minimumSpeed, maximumSpeed);
+    const angle = Math.random() * Math.PI * 2;
+    this.walkVelocityX = Math.cos(angle) * speed;
+    this.walkVelocityY = Math.sin(angle) * speed;
+    this.walkDuration = randomBetween(5, 20);
+    if (this.options.onMove !== undefined) {
+      this.offsetX = 0;
+      this.offsetY = 0;
     }
-    this.idleBehavior = direction < 0 ? "walk_left" : "walk_right";
+    this.options.onWalkStart?.();
+    this.idleBehavior = this.walkVelocityX < 0 ? "walk_left" : "walk_right";
     this.behaviorElapsed = 0;
   }
 
   private startSpecialIdle(behavior: "idle_adjust_skirt" | "idle_tail_cuddle"): void {
-    if (this.definition.animations[behavior] === undefined) {
-      this.finishIdleBehavior();
-      return;
-    }
+    resolveAnimation(this.definition, { state: behavior });
     this.idleBehavior = behavior;
     this.behaviorElapsed = 0;
   }
@@ -272,7 +465,11 @@ export class PetView {
   }
 
   private updatePosition(): void {
-    const transform = `translateX(calc(-50% + ${this.offsetX.toFixed(2)}px))`;
+    if (this.options.onMove !== undefined) {
+      this.options.onMove(this.offsetX, this.offsetY);
+      return;
+    }
+    const transform = `translateX(calc(-50% + ${this.offsetX.toFixed(2)}px)) translateY(${this.offsetY.toFixed(2)}px)`;
     this.canvas.style.transform = transform;
     this.bubbleWrap.style.transform = transform;
     this.nameTag.style.transform = transform;

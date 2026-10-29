@@ -8,7 +8,7 @@ const paths: Record<string, string> = {
   "running.searching": '<circle cx="10.5" cy="10.5" r="6.5"/><path d="m15.5 15.5 5 5M8 10.5h5M10.5 8v5"/>',
   succeeded: '<circle cx="12" cy="12" r="9"/><path d="m8 12 2.5 2.5L16 9"/>',
   failed: '<path d="M12 3 2.5 20h19L12 3Z"/><path d="M12 9v5m0 3h.01"/>',
-  succeeded_idle: '<path d="m4 13 2.5 2.5L12 10"/><path d="M20 6a6 6 0 0 1-8 8 7 7 0 0 0 8-8Z"/>',
+  succeeded_idle: '<circle cx="12" cy="12" r="9"/><path d="m8 12 2.5 2.5L16 9"/>',
   failed_idle: '<circle cx="12" cy="12" r="9"/><path d="M12 7v6m0 4h.01"/>',
   dragging: '<path d="M8 12V6a2 2 0 0 1 4 0v5-7a2 2 0 0 1 4 0v7-5a2 2 0 0 1 4 0v8c0 5-3 8-8 8-3 0-5-2-7-5l-2-3a2 2 0 0 1 3-2l2 2"/>',
   degraded: '<path d="M12 3 2.5 20h19L12 3Z"/><path d="M12 9v5m0 3h.01"/>',

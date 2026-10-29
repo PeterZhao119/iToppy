@@ -15,7 +15,7 @@
 | `kimi-app` | Kimi 普通聊天 App、Web | 未确认；不能套用 `~/.kimi-code` | 未确认 | 未实现，待实机 | 未分配 | 普通 Kimi 聊天与 Kimi Code 不是同一适配器 |
 | `claude-code` | Claude Code CLI、Claude Code IDE 形态 | `~/.claude/projects/<project>/<session>.jsonl` | JSONL 追加；消息、工具调用与结果、请求参数、正文 | 未实现，**高优先候选** | 未分配 | `CLAUDE_CONFIG_DIR` 可改变根目录；明文敏感信息较多；与 Claude Desktop 分开 |
 | `claude-desktop` | Claude Desktop 普通桌面聊天 | `~/Library/Application Support/Claude/` | 配置 JSON 为主；不等于 Claude Code 会话 | 暂不作为 Coding 监控目标 | 无 | 不复用 `claude-code` 的路径与状态规则 |
-| `codex` | OpenAI Codex CLI、Codex IDE/桌面 | `~/.codex/sessions/YYYY/MM/DD/rollout-*.jsonl`；桌面版另有 SQLite 状态 | JSONL 追加；角色、正文、工具调用；部分版本可能压缩 | 未实现，**高优先候选** | 未分配 | 桌面版差异、SQLite 和压缩格式需复核；普通 ChatGPT 不共用 |
+| `codex` | OpenAI Codex CLI、Codex VS Code 插件、Codex App | `${CODEX_HOME:-~/.codex}/sessions/YYYY/MM/DD/rollout-*.jsonl` | 共享 JSONL 增量事件；`session_meta` 提供 `cwd/source/originator`，`task_started/task_complete/turn_aborted` 提供结果边界 | **已支持核心链路**；真实 CLI 提交、思考、工具、成功、失败及 VS Code 来源已验证，搜索/取消用增量样本验证 | **GPT 娘** | 三者共用一个适配器和监听器，以来源 + 工作区区分实例；CLI 精确终端会话及 App 实机来源仍待验证；普通 ChatGPT 聊天不在本适配器范围 |
 | `chatgpt-app` | ChatGPT 普通桌面/Web 聊天 | 未确认；不得套用 Codex 目录 | 缓存/配置与 Coding 会话不同 | 暂不作为 Coding 监控目标 | 无 | ChatGPT 与 Codex 是不同产品形态 |
 | `copilot-cli` | GitHub Copilot CLI | `~/.copilot/session-state/<session-id>/events.jsonl`；`workspace.yaml`；`~/.copilot/session-store.db` | JSONL 事件流；会话期间及结束时增量写入 | 未实现，**高优先候选** | 未分配 | 与 Copilot IDE 插件分开；官方确认本地会话与可选云同步 |
 | `copilot-ide` | VS Code/JetBrains 的 GitHub Copilot 插件 | VS Code 可见 `~/Library/Application Support/Code/User/globalStorage/github.copilot-chat/`，会话结构未确认 | 未确认；不能直接复用 CLI 的 JSONL 规则 | 未实现，待实机 | 未分配 | 插件与 CLI 的会话和状态格式可能不同 |
@@ -62,6 +62,6 @@
 
 ## 默认角色分配约定
 
-- 当前仅 `kimi-code` 使用 DeepSeek Q 版原型角色。
+- `kimi-code` 使用 DeepSeek Q 版原型角色，`codex` 使用 GPT 娘。
 - 其他框架统一标记为“未分配”，后续由官方角色集确定，不自动复用 DeepSeek。
 - 角色分配与适配器解耦：用户可以按 Agent 实例更换，新增适配器不要求立即制作专属角色。

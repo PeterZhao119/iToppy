@@ -12,6 +12,8 @@ skills/
 node_modules/
 dist/
 lib/
+src-tauri/target/
+asset/avatar/*/draft/
 
 # macOS and local verification scratch
 .DS_Store

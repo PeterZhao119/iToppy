@@ -10,6 +10,6 @@ export interface AgentReadHost {
   joinPath(...parts: string[]): string;
   pathExists(path: string): Promise<boolean>;
   readDirectory(path: string): Promise<ReadDirectoryEntry[]>;
-  readTextFile(path: string): Promise<string>;
+  readTextFile(path: string, maxBytes?: number): Promise<string>;
   md5(value: string): string;
 }

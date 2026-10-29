@@ -71,6 +71,7 @@ export interface InstanceSettings {
   walkEnabled: boolean;
   walkSpeed: WalkSpeed;
   resultBubbleEnabled: boolean;
+  alwaysOnTop: boolean;
 }
 
 export type InstanceSettingsOverride = Partial<InstanceSettings>;
@@ -119,6 +120,8 @@ export interface TaskSnapshot {
   source?: AgentSource;
 }
 
+export type InstanceDisplayStatus = "candidate" | "visible" | "overflow" | "hidden";
+
 export interface SourceInstanceSnapshot {
   instance: SourceInstance;
   primary?: TaskSnapshot;
@@ -126,6 +129,7 @@ export interface SourceInstanceSnapshot {
   sessionCount: number;
   visible: boolean;
   monitoringEnabled: boolean;
+  displayStatus: InstanceDisplayStatus;
   settings: InstanceSettings;
 }
 

@@ -104,6 +104,34 @@ export class KimiSessionIndex {
     await this.refresh();
     return this.sourceFor(sessionId, wirePath);
   }
+
+  discoveredInstances(): SourceInstance[] {
+    const instances = new Map<string, SourceInstance>();
+    for (const entry of this.entries.values()) {
+      const instance = this.sourceFor(entry.sessionId);
+      if (instance !== undefined) instances.set(instance.instanceId, instance);
+    }
+    return [...instances.values()];
+  }
+
+  manualInstance(workspacePath: string): SourceInstance {
+    return {
+      agentType: "kimi-code",
+      instanceId: `vscode:${workspacePath}`,
+      hostKind: "vscode-workspace",
+      displayName: `Kimi Code · ${workspaceDisplayName(workspacePath)}`,
+      navigation: {
+        appBundleId: "com.microsoft.VSCode",
+        workspacePath,
+      },
+      dataSources: [{
+        scope: "agent",
+        kind: "directory",
+        role: "session-root",
+        path: this.sessionsPath,
+      }],
+    };
+  }
 }
 
 function workDirKeyFromPath(path: string): string | undefined {

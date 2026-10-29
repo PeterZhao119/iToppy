@@ -35,8 +35,9 @@ export class NodeReadHost implements AgentReadHost {
     }));
   }
 
-  readTextFile(path: string): Promise<string> {
-    return readFile(path, "utf8");
+  async readTextFile(path: string, maxBytes?: number): Promise<string> {
+    const content = await readFile(path, "utf8");
+    return maxBytes === undefined ? content : content.slice(0, maxBytes);
   }
 
   md5(value: string): string {

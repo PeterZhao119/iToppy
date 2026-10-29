@@ -6,12 +6,19 @@ import type {
   SourceInstanceSnapshot,
 } from "./model.js";
 import { SessionAggregator } from "./session-aggregator.js";
+import {
+  defaultAppSettings,
+  normalizeSettings,
+  type AppSettings,
+  type InstancePreferences,
+} from "../settings.js";
 
 interface InstanceRecord {
   instance: SourceInstance;
   aggregator: SessionAggregator;
   visible: boolean;
   monitoringEnabled: boolean;
+  hasActivity: boolean;
   settingsOverride: InstanceSettingsOverride;
 }
 
@@ -20,13 +27,53 @@ export const defaultInstanceSettings: InstanceSettings = {
   walkEnabled: true,
   walkSpeed: "standard",
   resultBubbleEnabled: true,
+  alwaysOnTop: true,
 };
 
 export class SourceInstanceRuntime {
   private readonly instances = new Map<string, InstanceRecord>();
   private readonly pendingEvents: AgentEvent[] = [];
+  private settings: AppSettings;
 
-  constructor(private readonly appDefaults: InstanceSettings = defaultInstanceSettings) {}
+  constructor(private readonly appDefaults: InstanceSettings = defaultInstanceSettings) {
+    this.settings = normalizeSettings({
+      ...defaultAppSettings,
+      defaultCharacterId: appDefaults.characterId,
+      walkEnabled: appDefaults.walkEnabled,
+      walkSpeed: appDefaults.walkSpeed,
+      resultBubbleEnabled: appDefaults.resultBubbleEnabled,
+      alwaysOnTop: appDefaults.alwaysOnTop,
+    });
+  }
+
+  configure(settings: AppSettings): void {
+    this.settings = normalizeSettings(settings);
+    for (const record of this.instances.values()) {
+      const preferences = this.preferences(record.instance.instanceId);
+      record.settingsOverride = settingsOverride(preferences);
+      const agentEnabled = this.settings.agents[record.instance.agentType]?.enabled ?? true;
+      record.monitoringEnabled = agentEnabled && preferences.monitoringEnabled !== false;
+      if (!record.monitoringEnabled || preferences.visible === false) record.visible = false;
+      if (record.monitoringEnabled && preferences.visible === true && !record.visible) {
+        record.hasActivity = true;
+        this.requestVisible(record);
+      }
+    }
+    this.enforceVisibleLimit();
+  }
+
+  register(instance: SourceInstance): SourceInstanceSnapshot {
+    const record = this.instances.get(instance.instanceId) ?? this.createRecord(instance);
+    record.instance = instance;
+    const preferences = this.preferences(instance.instanceId);
+    record.settingsOverride = settingsOverride(preferences);
+    const agentEnabled = this.settings.agents[instance.agentType]?.enabled ?? true;
+    record.monitoringEnabled = agentEnabled && preferences.monitoringEnabled !== false;
+    if (!record.monitoringEnabled) record.visible = false;
+    this.replayPending(record);
+    this.enforceVisibleLimit();
+    return this.snapshot(record);
+  }
 
   apply(event: AgentEvent): SourceInstanceSnapshot | undefined {
     const instanceId = event.instanceId ?? event.sourceInstance?.instanceId;
@@ -36,10 +83,14 @@ export class SourceInstanceRuntime {
     }
 
     const record = this.instances.get(instanceId) ?? this.createRecord(event.sourceInstance);
+    record.instance = event.sourceInstance;
     if (!record.monitoringEnabled) return this.snapshot(record);
 
     this.replayPending(record);
-    if (event.type === "task_submitted") record.visible = true;
+    if (event.type === "task_submitted") {
+      record.hasActivity = true;
+      if (this.settings.autoShowNewTasks) this.requestVisible(record);
+    }
     record.aggregator.apply(event, event.occurredAt ?? Date.now());
     return this.snapshot(record);
   }
@@ -55,8 +106,10 @@ export class SourceInstanceRuntime {
   show(instanceId: string): SourceInstanceSnapshot | undefined {
     const record = this.instances.get(instanceId);
     if (record === undefined) return undefined;
-    record.visible = true;
+    record.hasActivity = true;
     record.monitoringEnabled = true;
+    this.requestVisible(record);
+    this.enforceVisibleLimit();
     return this.snapshot(record);
   }
 
@@ -81,19 +134,62 @@ export class SourceInstanceRuntime {
     return this.pendingEvents.length;
   }
 
+  isMonitoring(instanceId: string): boolean {
+    return this.instances.get(instanceId)?.monitoringEnabled ?? true;
+  }
+
   private createRecord(instance: SourceInstance): InstanceRecord {
+    const preferences = this.preferences(instance.instanceId);
+    const agentEnabled = this.settings.agents[instance.agentType]?.enabled ?? true;
     const record: InstanceRecord = {
       instance,
       aggregator: new SessionAggregator(),
       visible: false,
-      monitoringEnabled: true,
-      settingsOverride: {},
+      monitoringEnabled: agentEnabled && preferences.monitoringEnabled !== false,
+      hasActivity: false,
+      settingsOverride: settingsOverride(preferences),
     };
     this.instances.set(instance.instanceId, record);
     return record;
   }
 
+  private requestVisible(record: InstanceRecord): void {
+    if (!record.monitoringEnabled) return;
+    if (record.visible) return;
+    const visibleCount = [...this.instances.values()].filter((item) => item.visible).length;
+    record.visible = visibleCount < this.settings.visibleLimit;
+  }
+
+  private enforceVisibleLimit(): void {
+    let remaining = this.settings.visibleLimit;
+    for (const record of this.instances.values()) {
+      if (!record.visible) continue;
+      if (remaining > 0 && record.monitoringEnabled) remaining -= 1;
+      else record.visible = false;
+    }
+  }
+
+  private preferences(instanceId: string): InstancePreferences {
+    return this.settings.instances[instanceId] ?? {};
+  }
+
   private snapshot(record: InstanceRecord): SourceInstanceSnapshot {
+    const agent = this.settings.agents[record.instance.agentType];
+    const agentDefaults: InstanceSettingsOverride = {
+      characterId: agent?.characterIdOverride,
+      walkEnabled: agent?.walkEnabledOverride,
+      walkSpeed: agent?.walkSpeedOverride,
+      resultBubbleEnabled: agent?.resultBubbleEnabledOverride,
+      alwaysOnTop: agent?.alwaysOnTopOverride,
+    };
+    const definedAgentDefaults = Object.fromEntries(
+      Object.entries(agentDefaults).filter(([, value]) => value !== undefined && value !== null),
+    ) as InstanceSettingsOverride;
+    const displayStatus = record.visible
+      ? "visible"
+      : !record.monitoringEnabled
+        ? "hidden"
+        : record.hasActivity ? "overflow" : "candidate";
     return {
       instance: record.instance,
       primary: record.aggregator.primary(),
@@ -101,7 +197,17 @@ export class SourceInstanceRuntime {
       sessionCount: record.aggregator.sessionCount(),
       visible: record.visible,
       monitoringEnabled: record.monitoringEnabled,
-      settings: { ...this.appDefaults, ...record.settingsOverride },
+      displayStatus,
+      settings: {
+        ...this.appDefaults,
+        characterId: this.settings.defaultCharacterId,
+        walkEnabled: this.settings.walkEnabled,
+        walkSpeed: this.settings.walkSpeed,
+        resultBubbleEnabled: this.settings.resultBubbleEnabled,
+        alwaysOnTop: this.settings.alwaysOnTop,
+        ...definedAgentDefaults,
+        ...record.settingsOverride,
+      },
     };
   }
 
@@ -111,6 +217,7 @@ export class SourceInstanceRuntime {
   }
 
   private replayPending(record: InstanceRecord): void {
+    if (!record.monitoringEnabled) return;
     const replay = this.pendingEvents.filter((pending) =>
       pending.instanceId === record.instance.instanceId ||
       pending.sourceInstance?.instanceId === record.instance.instanceId ||
@@ -123,8 +230,21 @@ export class SourceInstanceRuntime {
       if (pending !== undefined && replay.includes(pending)) this.pendingEvents.splice(index, 1);
     }
     for (const pending of replay) {
-      if (pending.type === "task_submitted") record.visible = true;
+      if (pending.type === "task_submitted") {
+        record.hasActivity = true;
+        if (this.settings.autoShowNewTasks) this.requestVisible(record);
+      }
       record.aggregator.apply(pending, pending.occurredAt ?? Date.now());
     }
   }
+}
+
+function settingsOverride(preferences: InstancePreferences): InstanceSettingsOverride {
+  return Object.fromEntries(Object.entries({
+    characterId: preferences.characterIdOverride,
+    walkEnabled: preferences.walkEnabledOverride,
+    walkSpeed: preferences.walkSpeedOverride,
+    resultBubbleEnabled: preferences.resultBubbleEnabledOverride,
+    alwaysOnTop: preferences.alwaysOnTopOverride,
+  }).filter(([, value]) => value !== undefined && value !== null)) as InstanceSettingsOverride;
 }

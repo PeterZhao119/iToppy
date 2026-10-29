@@ -58,7 +58,11 @@ const animationNames: Array<[string, string]> = [
 
 async function start(): Promise<void> {
   const registry = createDefaultCharacterRegistry();
-  const packageUrl = "/asset/avatar/deepseek/package";
+  const requestedCharacter = new URLSearchParams(window.location.search).get("character");
+  const characterId = requestedCharacter === "claude" || requestedCharacter === "gpt"
+    ? requestedCharacter
+    : "deepseek";
+  const packageUrl = `/asset/avatar/${characterId}/package`;
   const definition = await loadCharacterDefinition(`${packageUrl}/character.json`);
   registry.registerDefinition(definition);
   const rendererFactory = registry.renderers.get("sprite");

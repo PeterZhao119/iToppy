@@ -3,14 +3,22 @@ import { defineConfig } from "vite";
 import { createLivePreviewPlugin } from "./src/platform/vite-live-preview.js";
 
 export default defineConfig({
+  build: {
+    rollupOptions: {
+      input: ["index.html", "native.html", "control-panel.html"],
+    },
+  },
   plugins: [
     createLivePreviewPlugin(),
     {
       name: "copy-character-packages",
       async closeBundle() {
-        await cp("asset/avatar/deepseek/package", "dist/asset/avatar/deepseek/package", {
-          recursive: true,
-        });
+        for (const characterId of ["deepseek", "claude", "gpt"]) {
+          await cp(`asset/avatar/${characterId}/package`, `dist/asset/avatar/${characterId}/package`, {
+            recursive: true,
+          });
+        }
+        await cp("asset/brand", "dist/asset/brand", { recursive: true });
       },
     },
   ],

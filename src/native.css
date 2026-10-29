@@ -1,0 +1,31 @@
+:root { background: transparent; color: #eef1f7; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+* { box-sizing: border-box; }
+html, body, #app { width: 100%; height: 100%; margin: 0; overflow: hidden; background: transparent; }
+button { font: inherit; }
+.pet-card { position: relative; width: 100%; height: 100%; overflow: visible; background: transparent; }
+.pet-heading, .pet-meta, .monitor-health { display: none; }
+.pet-stage { position: relative; width: 100%; height: 100%; }
+canvas { display: block; }
+.pet-stage canvas { position: absolute; bottom: 10px; left: 50%; width: 104px; height: 185px; transform: translateX(-50%); cursor: grab; }
+.pet-stage canvas:active { cursor: grabbing; }
+.pet-nametag { position: absolute; bottom: 198px; left: 50%; display: flex; width: max-content; min-width: 64px; max-width: 160px; height: 34px; align-items: center; justify-content: center; gap: 6px; padding: 2px 8px; border: 1px solid #ffffff2e; border-radius: 10px; background: linear-gradient(135deg, #27344dd9, #151c2bd9); box-shadow: 0 4px 14px #080c1659, inset 0 1px 0 #ffffff14; backdrop-filter: blur(14px); color: #eef4ff; font-size: 11px; line-height: 1.15; text-shadow: 0 1px 3px #000; transform: translateX(-50%); }
+.nametag-copy { display: flex; min-width: 0; flex-direction: column; align-items: flex-start; gap: 2px; }
+.nametag-copy > span { max-width: 110px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nametag-copy [data-agent-name] { font-size: 11px; font-weight: 600; }
+.nametag-copy [data-workspace-name] { color: #c3cede; font-size: 10px; font-weight: 400; }
+.status-icon { display: inline-flex; flex: 0 0 18px; width: 18px; height: 18px; color: #aab4c8; }
+.status-icon svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.pet-card[data-state="running"] .status-icon { color: #8db7ff; }
+.pet-card[data-activity="thinking"] .status-icon { color: #c5a7f2; }
+.pet-card[data-activity="tool_calling"] .status-icon { color: #f0bd78; }
+.pet-card[data-activity="searching"] .status-icon { color: #79d5df; }
+.pet-card[data-state^="succeeded"] .status-icon { color: #79d7a9; }
+.pet-card[data-state^="failed"] .status-icon { color: #ef939b; }
+.bubble-wrap { position: absolute; z-index: 2; bottom: 242px; left: 50%; display: none; width: 208px; align-items: flex-start; transform: translateX(-50%); }
+.has-bubble .bubble-wrap { display: flex; }
+.response-bubble { display: block; width: 100%; max-height: calc(4 * 1.45em + 20px); padding: 10px; overflow: hidden; border: 1px solid #5b6c89; border-radius: 13px; background: #f4f7fc; color: #202738; font-size: 12px; line-height: 1.45; text-align: left; cursor: pointer; box-shadow: 0 7px 22px #0b0d1355; overflow-wrap: anywhere; }
+.response-bubble [data-response] { display: -webkit-box; max-height: calc(4 * 1.45em); overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 4; }
+.response-bubble:disabled { cursor: not-allowed; opacity: .75; }
+.bubble-close { position: absolute; top: -8px; right: 4px; width: 20px; height: 20px; padding: 0; border: 1px solid #536079; border-radius: 50%; background: #2b3343; color: #d7deeb; font-size: 13px; cursor: pointer; }
+.result-toggle { display: none; }
+#native-health { position: fixed; top: 4px; left: 8px; right: 8px; color: #ffadad; font-size: 10px; text-align: center; }
