@@ -1,0 +1,157 @@
+{
+  "id": "deepseek",
+  "name": "DeepSeek Q 版角色",
+  "version": "1.0.0",
+  "frame_width": 384,
+  "frame_height": 683,
+  "anchor": {
+    "position": "bottom_center",
+    "x": 192,
+    "y": 683,
+    "coordinate_space": "frame_pixels",
+    "origin": "top_left"
+  },
+  "fps": 12,
+  "columns": 6,
+  "thumbnail": {
+    "path": "thumbnail.png",
+    "width": 192,
+    "height": 342,
+    "source": "spritesheets/idle.png"
+  },
+  "stateMap": {
+    "running.generic": "running.tool_calling"
+  },
+  "animations": {
+    "idle": {
+      "spritesheet": "spritesheets/idle.png",
+      "frame_count": 24,
+      "columns": 6,
+      "rows": 4,
+      "fps": 12,
+      "duration_seconds": 2,
+      "loop": true,
+      "frame_order": "row_major"
+    },
+    "walk_left": {
+      "spritesheet": "spritesheets/walk_left.png",
+      "frame_count": 24,
+      "columns": 6,
+      "rows": 4,
+      "fps": 12,
+      "duration_seconds": 2,
+      "loop": true,
+      "frame_order": "row_major"
+    },
+    "walk_right": {
+      "spritesheet": "spritesheets/walk_right.png",
+      "frame_count": 24,
+      "columns": 6,
+      "rows": 4,
+      "fps": 12,
+      "duration_seconds": 2,
+      "loop": true,
+      "frame_order": "row_major"
+    },
+    "running.thinking": {
+      "spritesheet": "spritesheets/running.thinking.png",
+      "frame_count": 24,
+      "columns": 6,
+      "rows": 4,
+      "fps": 12,
+      "duration_seconds": 2,
+      "loop": true,
+      "frame_order": "row_major"
+    },
+    "running.tool_calling": {
+      "spritesheet": "spritesheets/running.tool_calling.png",
+      "frame_count": 24,
+      "columns": 6,
+      "rows": 4,
+      "fps": 12,
+      "duration_seconds": 2,
+      "loop": true,
+      "frame_order": "row_major"
+    },
+    "running.searching": {
+      "spritesheet": "spritesheets/searching.png",
+      "frame_count": 24,
+      "columns": 6,
+      "rows": 4,
+      "fps": 12,
+      "duration_seconds": 2,
+      "loop": true,
+      "frame_order": "row_major"
+    },
+    "succeeded": {
+      "spritesheet": "spritesheets/succeeded.png",
+      "frame_count": 24,
+      "columns": 6,
+      "rows": 4,
+      "fps": 12,
+      "duration_seconds": 2,
+      "loop": false,
+      "frame_order": "row_major"
+    },
+    "failed": {
+      "spritesheet": "spritesheets/failed.png",
+      "frame_count": 24,
+      "columns": 6,
+      "rows": 4,
+      "fps": 12,
+      "duration_seconds": 2,
+      "loop": false,
+      "frame_order": "row_major"
+    },
+    "succeeded_idle": {
+      "spritesheet": "spritesheets/succeeded_idle.png",
+      "frame_count": 24,
+      "columns": 6,
+      "rows": 4,
+      "fps": 12,
+      "duration_seconds": 2,
+      "loop": true,
+      "frame_order": "row_major"
+    },
+    "failed_idle": {
+      "spritesheet": "spritesheets/failed_idle.png",
+      "frame_count": 24,
+      "columns": 6,
+      "rows": 4,
+      "fps": 12,
+      "duration_seconds": 2,
+      "loop": true,
+      "frame_order": "row_major"
+    },
+    "dragging": {
+      "spritesheet": "spritesheets/dragging.png",
+      "frame_count": 24,
+      "columns": 6,
+      "rows": 4,
+      "fps": 12,
+      "duration_seconds": 2,
+      "loop": true,
+      "frame_order": "row_major"
+    },
+    "idle_adjust_skirt": {
+      "spritesheet": "spritesheets/idle_adjust_skirt.png",
+      "frame_count": 60,
+      "columns": 6,
+      "rows": 10,
+      "fps": 12,
+      "duration_seconds": 5,
+      "loop": true,
+      "frame_order": "row_major"
+    },
+    "idle_tail_cuddle": {
+      "spritesheet": "spritesheets/idle_tail_cuddle.png",
+      "frame_count": 60,
+      "columns": 6,
+      "rows": 10,
+      "fps": 12,
+      "duration_seconds": 5,
+      "loop": true,
+      "frame_order": "row_major"
+    }
+  }
+}
