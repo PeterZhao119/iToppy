@@ -1,6 +1,10 @@
 import type { AgentReadHost } from "../../core/agents/host.js";
 import type { SourceHostKind, SourceInstance } from "../../core/agents/model.js";
-import { parseCodexSessionMetadata, type CodexSessionMetadata } from "./rollout.js";
+import {
+  isCodexSubagentMetadata,
+  parseCodexSessionMetadata,
+  type CodexSessionMetadata,
+} from "./rollout.js";
 
 interface IndexedSession extends CodexSessionMetadata {
   rolloutPath: string;
@@ -37,7 +41,9 @@ export class CodexSessionIndex {
   sourceFor(sessionId: string, rolloutPath?: string): SourceInstance | undefined {
     const metadata = (rolloutPath === undefined ? undefined : this.paths.get(rolloutPath)) ??
       this.sessions.get(sessionId);
-    return metadata === undefined ? undefined : this.sourceFrom(metadata);
+    return metadata === undefined || isCodexSubagentMetadata(metadata)
+      ? undefined
+      : this.sourceFrom(metadata);
   }
 
   async sourceForWithRefresh(sessionId: string, rolloutPath: string): Promise<SourceInstance | undefined> {
@@ -47,9 +53,15 @@ export class CodexSessionIndex {
     return this.sourceFor(sessionId, rolloutPath);
   }
 
+  isSubagent(rolloutPath: string): boolean {
+    const metadata = this.paths.get(rolloutPath);
+    return metadata !== undefined && isCodexSubagentMetadata(metadata);
+  }
+
   discoveredInstances(): SourceInstance[] {
     const instances = new Map<string, SourceInstance>();
     for (const metadata of this.sessions.values()) {
+      if (isCodexSubagentMetadata(metadata)) continue;
       const instance = this.sourceFrom(metadata);
       instances.set(instance.instanceId, instance);
     }

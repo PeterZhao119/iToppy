@@ -72,6 +72,9 @@ function render(): void {
           <option value="deepseek" ${settings.defaultCharacterId === "deepseek" ? "selected" : ""}>DeepSeek</option>
           <option value="claude" ${settings.defaultCharacterId === "claude" ? "selected" : ""}>Claude</option>
           <option value="gpt" ${settings.defaultCharacterId === "gpt" ? "selected" : ""}>GPT 娘</option>
+          <option value="doubao" ${settings.defaultCharacterId === "doubao" ? "selected" : ""}>Doubao 娘</option>
+          <option value="qq" ${settings.defaultCharacterId === "qq" ? "selected" : ""}>QQ 娘</option>
+          <option value="kimi" ${settings.defaultCharacterId === "kimi" ? "selected" : ""}>Kimi 娘</option>
         </select></label>
         <label>默认游走速度<select data-setting="walkSpeed">${speedOptions(settings.walkSpeed)}</select></label>
         ${checkbox("新任务自动显示", "autoShowNewTasks", settings.autoShowNewTasks)}
@@ -90,6 +93,10 @@ function render(): void {
         <div><strong>Codex</strong><span>CLI / VS Code / App 共享 rollout · 默认 GPT 娘</span></div>
         <label class="switch"><input data-agent-enabled="codex" type="checkbox" ${settings.agents.codex?.enabled !== false ? "checked" : ""}>启用监控</label>
       </article>
+      <article class="agent-card">
+        <div><strong>Claude Code</strong><span>CLI / IDE / Desktop Code 共享 JSONL · 默认 Claude 娘</span></div>
+        <label class="switch"><input data-agent-enabled="claude-code" type="checkbox" ${settings.agents["claude-code"]?.enabled !== false ? "checked" : ""}>启用监控</label>
+      </article>
     </section>
     ${instanceSection("正在显示", visible)}
     ${instanceSection("其他活跃实例", overflow, "超过可见上限的实例仍在监控；提高上限或隐藏其他实例后可显示。")}
@@ -97,7 +104,7 @@ function render(): void {
     <section class="manual-section">
       <div class="section-heading"><h2>手动添加</h2><span>按 Agent 类型 + 目标工作区目录</span></div>
       <form id="manual-form">
-        <select name="agentType" aria-label="Agent 类型"><option value="kimi-code">Kimi Code</option><option value="codex">Codex CLI</option></select>
+        <select name="agentType" aria-label="Agent 类型"><option value="kimi-code">Kimi Code</option><option value="codex">Codex CLI</option><option value="claude-code">Claude CLI</option></select>
         <input name="workspacePath" type="text" required placeholder="/Users/you/workspace/project" aria-label="目标工作区目录">
         <button class="primary" type="submit">验证并添加</button>
       </form>
@@ -153,6 +160,9 @@ function instanceCard(instance: NativeInstanceState): string {
           <option value="deepseek" ${instance.settings.characterId === "deepseek" && preferences.characterIdOverride !== undefined ? "selected" : ""}>DeepSeek</option>
           <option value="claude" ${instance.settings.characterId === "claude" && preferences.characterIdOverride !== undefined ? "selected" : ""}>Claude</option>
           <option value="gpt" ${instance.settings.characterId === "gpt" && preferences.characterIdOverride !== undefined ? "selected" : ""}>GPT 娘</option>
+          <option value="doubao" ${instance.settings.characterId === "doubao" && preferences.characterIdOverride !== undefined ? "selected" : ""}>Doubao 娘</option>
+          <option value="qq" ${instance.settings.characterId === "qq" && preferences.characterIdOverride !== undefined ? "selected" : ""}>QQ 娘</option>
+          <option value="kimi" ${instance.settings.characterId === "kimi" && preferences.characterIdOverride !== undefined ? "selected" : ""}>Kimi 娘</option>
         </select></label>
         <label>游走速度<select data-pref="walkSpeedOverride">${speedOptions(instance.settings.walkSpeed)}</select></label>
         ${instanceCheckbox(instance, "resultBubbleEnabledOverride", "结果气泡", instance.settings.resultBubbleEnabled)}

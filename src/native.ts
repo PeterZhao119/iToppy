@@ -3,6 +3,8 @@ import { invoke } from "@tauri-apps/api/core";
 import { emit, listen } from "@tauri-apps/api/event";
 import { getCurrentWindow, PhysicalPosition } from "@tauri-apps/api/window";
 import { WebviewWindow } from "@tauri-apps/api/webviewWindow";
+import { ClaudeJsonlParser } from "./adapters/claude-code/jsonl.js";
+import { ClaudeSessionIndex, claudeSessionIdFromPath } from "./adapters/claude-code/source-index.js";
 import { CodexRolloutParser } from "./adapters/codex/rollout.js";
 import { CodexSessionIndex, codexSessionIdFromPath } from "./adapters/codex/source-index.js";
 import { KimiSessionIndex } from "./adapters/kimi-code/source-index.js";
@@ -57,24 +59,27 @@ let positionedInstanceId: string | undefined;
 let positionSaveTimer: ReturnType<typeof setTimeout> | undefined;
 let nativeStateVersion = 0;
 
-const [home, kimiHome, codexHome, deepseekDefinition, claudeDefinition, gptDefinition, storedSettings, initialNativeState] = await Promise.all([
+const characterIds = ["deepseek", "claude", "gpt", "doubao", "qq", "kimi"] as const;
+type CharacterId = (typeof characterIds)[number];
+type LoadedDefinition = Awaited<ReturnType<typeof loadCharacterDefinition>>;
+const [home, kimiHome, codexHome, claudeHome, loadedDefinitions, storedSettings, initialNativeState] = await Promise.all([
   invoke<string>("get_home_directory"),
   invoke<string>("get_kimi_home"),
   invoke<string>("get_codex_home"),
-  loadCharacterDefinition("/asset/avatar/deepseek/package/character.json"),
-  loadCharacterDefinition("/asset/avatar/claude/package/character.json"),
-  loadCharacterDefinition("/asset/avatar/gpt/package/character.json"),
+  invoke<string>("get_claude_home"),
+  Promise.all(characterIds.map((characterId) => loadCharacterDefinition(`/asset/avatar/${characterId}/package/character.json`))),
   invoke<AppSettings>("get_settings"),
   invoke<NativeRuntimeState>("get_native_state"),
 ]);
-const definitions = { deepseek: deepseekDefinition, claude: claudeDefinition, gpt: gptDefinition };
-let currentCharacterId = "";
+const definitions = Object.fromEntries(characterIds.map((characterId, index) => [characterId, loadedDefinitions[index]])) as Record<CharacterId, LoadedDefinition>;
+let currentCharacterId: CharacterId = "deepseek";
 appSettings = normalizeSettings(storedSettings);
 monitorError = initialNativeState.monitorError;
 runtime.configure(appSettings);
-const host = new TauriReadHost(home, kimiHome, codexHome);
+const host = new TauriReadHost(home, kimiHome, codexHome, claudeHome);
 const sessionIndex = new KimiSessionIndex(host, kimiHome);
 const codexIndex = new CodexSessionIndex(host, codexHome);
+const claudeIndex = new ClaudeSessionIndex(host, claudeHome);
 
 const options = {
   onOpenTarget: (navigation: NavigationTarget) => {
@@ -140,9 +145,7 @@ window.addEventListener("pointermove", (event) => {
 function render(snapshot: SourceInstanceSnapshot): void {
   if (assignedInstanceId === null) assignedInstanceId = snapshot.instance.instanceId;
   if (snapshot.instance.instanceId !== assignedInstanceId) return;
-  const characterId = snapshot.settings.characterId === "claude"
-    ? "claude"
-    : snapshot.settings.characterId === "gpt" ? "gpt" : "deepseek";
+  const characterId = resolveCharacterId(snapshot.settings.characterId);
   if (view !== undefined && currentCharacterId !== characterId) {
     view.destroy();
     view = undefined;
@@ -184,11 +187,17 @@ function sync(): void {
   if (assignedInstanceId === null && snapshots[0] !== undefined) {
     assignedInstanceId = snapshots[0].instance.instanceId;
   }
+  if (assignedInstanceId !== null) closeSecondaryWindow(assignedInstanceId);
   for (const snapshot of snapshots) {
     const instanceId = snapshot.instance.instanceId;
     if (instanceId !== assignedInstanceId && !createdInstances.has(instanceId)) {
       createdInstances.add(instanceId);
       void createPetWindow(snapshot, createdInstances.size);
+    }
+  }
+  for (const instanceId of [...createdInstances]) {
+    if (!snapshots.some((snapshot) => snapshot.instance.instanceId === instanceId)) {
+      closeSecondaryWindow(instanceId);
     }
   }
   for (const snapshot of allSnapshots) {
@@ -197,6 +206,11 @@ function sync(): void {
   const selected = snapshots.find((snapshot) => snapshot.instance.instanceId === assignedInstanceId);
   if (selected !== undefined) render(selected);
   void publishNativeState(allSnapshots);
+}
+
+function closeSecondaryWindow(instanceId: string): void {
+  if (!createdInstances.delete(instanceId)) return;
+  void invoke("close_pet_window", { label: windowLabel(instanceId) }).catch(showError);
 }
 
 async function publishNativeState(snapshots: SourceInstanceSnapshot[]): Promise<void> {
@@ -214,13 +228,14 @@ async function publishNativeState(snapshots: SourceInstanceSnapshot[]): Promise<
 }
 
 async function rescanInstances(): Promise<void> {
-  await Promise.all([sessionIndex.refresh(), codexIndex.refresh()]);
+  await Promise.all([sessionIndex.refresh(), codexIndex.refresh(), claudeIndex.refresh()]);
   for (const instance of sessionIndex.discoveredInstances()) runtime.register(instance);
   for (const instance of codexIndex.discoveredInstances()) runtime.register(instance);
+  for (const instance of claudeIndex.discoveredInstances()) runtime.register(instance);
   for (const manual of appSettings.manualInstances) {
-    runtime.register(manual.agentType === "codex"
-      ? codexIndex.manualInstance(manual.workspacePath)
-      : sessionIndex.manualInstance(manual.workspacePath));
+    if (manual.agentType === "codex") runtime.register(codexIndex.manualInstance(manual.workspacePath));
+    else if (manual.agentType === "claude-code") runtime.register(claudeIndex.manualInstance(manual.workspacePath));
+    else runtime.register(sessionIndex.manualInstance(manual.workspacePath));
   }
   sync();
 }
@@ -265,12 +280,32 @@ async function handleKimiAppend(payload: WireAppend): Promise<void> {
 async function handleCodexAppend(payload: WireAppend): Promise<void> {
   const sessionId = codexSessionIdFromPath(payload.path);
   const sourceInstance = await codexIndex.sourceForWithRefresh(sessionId, payload.path);
+  if (codexIndex.isSubagent(payload.path)) return;
   if (sourceInstance !== undefined && !runtime.isMonitoring(sourceInstance.instanceId)) return;
   let cursor = parsers.get(payload.path);
   if (cursor === undefined) {
     cursor = {
       parser: new CodexRolloutParser({
         agentType: "codex",
+        sessionId,
+        workspacePath: sourceInstance?.navigation.workspacePath,
+      }),
+      sourceInstance,
+    };
+    parsers.set(payload.path, cursor);
+  }
+  applyParsedEvents(payload.content, cursor, sourceInstance);
+}
+
+async function handleClaudeAppend(payload: WireAppend): Promise<void> {
+  const sessionId = claudeSessionIdFromPath(payload.path);
+  const sourceInstance = await claudeIndex.sourceForWithRefresh(sessionId, payload.path);
+  if (sourceInstance !== undefined && !runtime.isMonitoring(sourceInstance.instanceId)) return;
+  let cursor = parsers.get(payload.path);
+  if (cursor === undefined) {
+    cursor = {
+      parser: new ClaudeJsonlParser({
+        agentType: "claude-code",
         sessionId,
         workspacePath: sourceInstance?.navigation.workspacePath,
       }),
@@ -315,12 +350,20 @@ await listen<WireAppend>("kimi-wire", (event) => {
 await listen<WireAppend>("codex-rollout", (event) => {
   if (isMainWindow) void handleCodexAppend(event.payload).catch(showError);
 });
+await listen<WireAppend>("claude-jsonl", (event) => {
+  if (isMainWindow) void handleClaudeAppend(event.payload).catch(showError);
+});
 await listen<string>("kimi-monitor-error", (event) => {
   monitorError = event.payload;
   showError(event.payload);
   sync();
 });
 await listen<string>("codex-monitor-error", (event) => {
+  monitorError = event.payload;
+  showError(event.payload);
+  sync();
+});
+await listen<string>("claude-monitor-error", (event) => {
   monitorError = event.payload;
   showError(event.payload);
   sync();
@@ -414,6 +457,10 @@ function schedulePositionSave(x: number, y: number): void {
       void invoke("save_pet_position", { instanceId: assignedInstanceId, x, y }).catch(showError);
     }
   }, 500);
+}
+
+function resolveCharacterId(value: string): CharacterId {
+  return characterIds.includes(value as CharacterId) ? value as CharacterId : "deepseek";
 }
 
 function windowLabel(instanceId: string): string {

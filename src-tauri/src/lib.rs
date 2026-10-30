@@ -70,6 +70,11 @@ fn get_codex_home() -> Result<String, String> {
 }
 
 #[tauri::command]
+fn get_claude_home() -> Result<String, String> {
+    watcher::claude_home().map(|path| path.to_string_lossy().to_string())
+}
+
+#[tauri::command]
 fn path_exists(path: String) -> bool {
     std::path::Path::new(&path).exists()
 }
@@ -231,8 +236,8 @@ fn add_manual_instance(
     agent_type: String,
     workspace_path: String,
 ) -> Result<AppSettings, String> {
-    if !matches!(agent_type.as_str(), "kimi-code" | "codex") {
-        return Err("Only Kimi Code and Codex are supported in this version.".to_string());
+    if !matches!(agent_type.as_str(), "kimi-code" | "codex" | "claude-code") {
+        return Err("Only Kimi Code, Codex and Claude Code are supported in this version.".to_string());
     }
     let path = std::path::Path::new(&workspace_path);
     if !path.is_dir() {
@@ -348,6 +353,14 @@ fn set_pet_always_on_top(window: WebviewWindow, always_on_top: bool) -> Result<(
         .map_err(|error| error.to_string())
 }
 
+#[tauri::command]
+fn close_pet_window(app: AppHandle, label: String) -> Result<(), String> {
+    if let Some(window) = app.get_webview_window(&label) {
+        window.close().map_err(|error| error.to_string())?;
+    }
+    Ok(())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -356,6 +369,7 @@ pub fn run() {
             get_home_directory,
             get_kimi_home,
             get_codex_home,
+            get_claude_home,
             path_exists,
             read_text_file,
             read_directory,
@@ -377,6 +391,7 @@ pub fn run() {
             get_pet_bounds,
             set_pet_position,
             set_pet_always_on_top,
+            close_pet_window,
             menu::show_pet_context_menu,
             menu::open_control_panel
         ])
@@ -412,6 +427,9 @@ pub fn run() {
             }
             if let Err(error) = watcher::start_codex(handle.clone()) {
                 let _ = handle.emit("codex-monitor-error", error);
+            }
+            if let Err(error) = watcher::start_claude(handle.clone()) {
+                let _ = handle.emit("claude-monitor-error", error);
             }
             Ok(())
         })

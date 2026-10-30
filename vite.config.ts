@@ -13,7 +13,7 @@ export default defineConfig({
     {
       name: "copy-character-packages",
       async closeBundle() {
-        for (const characterId of ["deepseek", "claude", "gpt"]) {
+        for (const characterId of ["deepseek", "claude", "gpt", "doubao", "qq", "kimi"]) {
           await cp(`asset/avatar/${characterId}/package`, `dist/asset/avatar/${characterId}/package`, {
             recursive: true,
           });

@@ -6,6 +6,7 @@ export class TauriReadHost implements AgentReadHost {
     private readonly home: string,
     private readonly kimiHome: string,
     private readonly codexHome: string,
+    private readonly claudeHome: string,
   ) {}
 
   homeDirectory(): string {
@@ -15,6 +16,7 @@ export class TauriReadHost implements AgentReadHost {
   environmentVariable(name: string): string | undefined {
     if (name === "KIMI_CODE_HOME") return this.kimiHome;
     if (name === "CODEX_HOME") return this.codexHome;
+    if (name === "CLAUDE_CONFIG_DIR") return this.claudeHome;
     return undefined;
   }
 

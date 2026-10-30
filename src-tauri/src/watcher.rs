@@ -43,10 +43,22 @@ pub fn codex_home() -> Result<PathBuf, String> {
         .ok_or_else(|| "Unable to resolve the home directory.".to_string())
 }
 
+pub fn claude_home() -> Result<PathBuf, String> {
+    if let Some(path) = std::env::var_os("CLAUDE_CONFIG_DIR") {
+        if !path.is_empty() {
+            return Ok(PathBuf::from(path));
+        }
+    }
+    dirs::home_dir()
+        .map(|home| home.join(".claude"))
+        .ok_or_else(|| "Unable to resolve the home directory.".to_string())
+}
+
 #[derive(Clone, Copy)]
 enum MonitorKind {
     Kimi,
     Codex,
+    Claude,
 }
 
 pub fn start(app: AppHandle) -> Result<(), String> {
@@ -57,10 +69,15 @@ pub fn start_codex(app: AppHandle) -> Result<(), String> {
     start_monitor(app, MonitorKind::Codex)
 }
 
+pub fn start_claude(app: AppHandle) -> Result<(), String> {
+    start_monitor(app, MonitorKind::Claude)
+}
+
 fn start_monitor(app: AppHandle, kind: MonitorKind) -> Result<(), String> {
     let sessions = match kind {
         MonitorKind::Kimi => kimi_home()?.join("sessions"),
         MonitorKind::Codex => codex_home()?.join("sessions"),
+        MonitorKind::Claude => claude_home()?.join("projects"),
     };
     if !sessions.is_dir() {
         return Err(format!("Agent sessions directory does not exist: {}", sessions.display()));
@@ -68,6 +85,7 @@ fn start_monitor(app: AppHandle, kind: MonitorKind) -> Result<(), String> {
     let (append_event, error_event) = match kind {
         MonitorKind::Kimi => ("kimi-wire", "kimi-monitor-error"),
         MonitorKind::Codex => ("codex-rollout", "codex-monitor-error"),
+        MonitorKind::Claude => ("claude-jsonl", "claude-monitor-error"),
     };
 
     let mut cursors = HashMap::new();
@@ -196,5 +214,11 @@ fn is_monitored_file(path: &Path, kind: MonitorKind) -> bool {
     match kind {
         MonitorKind::Kimi => name == "wire.jsonl",
         MonitorKind::Codex => name.starts_with("rollout-") && name.ends_with(".jsonl"),
+        MonitorKind::Claude => {
+            name.len() == 42 && name.ends_with(".jsonl") &&
+                name.get(..36).is_some_and(|id| {
+                    id.chars().all(|character| character.is_ascii_hexdigit() || character == '-')
+                })
+        }
     }
 }

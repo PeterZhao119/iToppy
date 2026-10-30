@@ -221,7 +221,14 @@ fn instance_items<R: Runtime>(
     ];
 
     let character = SubmenuBuilder::new(app, "切换形象").build()?;
-    for (character_id, label) in [("deepseek", "DeepSeek"), ("claude", "Claude"), ("gpt", "GPT 娘")] {
+    for (character_id, label) in [
+        ("deepseek", "DeepSeek"),
+        ("claude", "Claude"),
+        ("gpt", "GPT 娘"),
+        ("doubao", "Doubao 娘"),
+        ("qq", "QQ 娘"),
+        ("kimi", "Kimi 娘"),
+    ] {
         character.append(&CheckMenuItem::with_id(
             app,
             action_id(&format!("character-{character_id}"), id),
@@ -357,6 +364,11 @@ pub fn handle_menu_event(app: &AppHandle, event: tauri::menu::MenuEvent) {
                 "character-gpt" => {
                     preferences.character_id_override = Some("gpt".to_string())
                 }
+                "character-doubao" => {
+                    preferences.character_id_override = Some("doubao".to_string())
+                }
+                "character-qq" => preferences.character_id_override = Some("qq".to_string()),
+                "character-kimi" => preferences.character_id_override = Some("kimi".to_string()),
                 _ => {}
             });
         }

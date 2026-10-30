@@ -4,7 +4,7 @@
 
 ## 1. 首版产品形态
 
-首版接入 VS Code 的 Kimi Code 和共享本地 rollout 的 Codex，系统从设计上支持多 Agent 类型：
+首版接入 VS Code 的 Kimi Code、共享本地 rollout 的 Codex 和共享本地 JSONL 的 Claude Code，系统从设计上支持多 Agent 类型：
 
 - 启动后从各 Agent 类型的默认路径发现本机实例。
 - 用户在控制面板选择需要展示并监控的实例。

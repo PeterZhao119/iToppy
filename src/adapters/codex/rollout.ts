@@ -19,9 +19,20 @@ export interface RolloutPayload {
   type?: string;
   id?: string;
   session_id?: string;
+  turn_id?: string;
+  root_turn_id?: string;
+  parent_turn_id?: string | null;
+  initiating_agent_path?: string | null;
+  agent_path?: string | null;
+  turn_attribution?: {
+    turn_id?: string;
+    root_turn_id?: string;
+    parent_turn_id?: string | null;
+    initiating_agent_path?: string | null;
+  };
   cwd?: string;
-  source?: string;
-  originator?: string;
+  source?: unknown;
+  originator?: unknown;
   role?: string;
   name?: string;
   message?: string;
@@ -55,8 +66,8 @@ export function parseCodexSessionMetadata(content: string): CodexSessionMetadata
       return {
         sessionId,
         cwd: payload.cwd,
-        source: payload.source ?? "cli",
-        originator: payload.originator ?? "codex_cli",
+        source: sourceLabel(payload.source, "cli"),
+        originator: sourceLabel(payload.originator, "codex_cli"),
       };
     } catch {
       return undefined;
@@ -65,8 +76,35 @@ export function parseCodexSessionMetadata(content: string): CodexSessionMetadata
   return undefined;
 }
 
+export function isCodexSubagentMetadata(metadata: CodexSessionMetadata): boolean {
+  const source = metadata.source.toLowerCase();
+  const originator = metadata.originator.toLowerCase();
+  return source.startsWith("subagent") || source.includes("thread_spawn") ||
+    originator.includes("subagent") || originator.includes("thread_spawn");
+}
+
+function sourceLabel(value: unknown, fallback: string): string {
+  if (typeof value === "string" && value.trim() !== "") return value;
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const label = sourceLabel(item, "");
+      if (label !== "") return label;
+    }
+  }
+  if (typeof value === "object" && value !== null) {
+    const record = value as Record<string, unknown>;
+    for (const key of ["type", "kind", "name", "source", "originator"]) {
+      const label = sourceLabel(record[key], "");
+      if (label !== "") return label;
+    }
+  }
+  return fallback;
+}
+
 export class CodexRolloutParser {
   private latestResponse: string | undefined;
+  private mainRootTurnId: string | undefined;
+  private mainTurnId: string | undefined;
 
   constructor(private readonly options: RolloutParseOptions) {}
 
@@ -99,7 +137,13 @@ export class CodexRolloutParser {
         continue;
       }
       const payload = record.payload;
-      if (payload === undefined) continue;
+      if (payload === undefined || isSubagentPayload(payload)) continue;
+      const rootTurnId = payload.root_turn_id ?? payload.turn_attribution?.root_turn_id;
+      const turnId = payload.turn_id ?? payload.turn_attribution?.turn_id;
+      if (payload.type !== "task_started") {
+        if (this.mainRootTurnId !== undefined && rootTurnId !== undefined && rootTurnId !== this.mainRootTurnId) continue;
+        if (this.mainTurnId !== undefined && turnId !== undefined && turnId !== this.mainTurnId) continue;
+      }
 
       if (record.type === "response_item") {
         this.parseResponseItem(payload, emit);
@@ -109,6 +153,8 @@ export class CodexRolloutParser {
 
       switch (payload.type) {
         case "task_started":
+          this.mainRootTurnId = rootTurnId ?? this.mainRootTurnId;
+          this.mainTurnId = turnId ?? this.mainTurnId;
           this.latestResponse = undefined;
           emit({ type: "task_submitted", message: "收到任务，开始处理" });
           break;
@@ -201,6 +247,14 @@ export class CodexRolloutParser {
 
 export function parseCodexRollout(content: string, options: RolloutParseOptions): AgentEvent[] {
   return new CodexRolloutParser(options).parse(content);
+}
+
+function isSubagentPayload(payload: RolloutPayload): boolean {
+  const parentTurnId = payload.parent_turn_id ?? payload.turn_attribution?.parent_turn_id;
+  const agentPath = payload.initiating_agent_path ?? payload.agent_path ??
+    payload.turn_attribution?.initiating_agent_path;
+  return (typeof parentTurnId === "string" && parentTurnId !== "") ||
+    (typeof agentPath === "string" && agentPath !== "");
 }
 
 function nonEmpty(value: string | null | undefined): string | undefined {

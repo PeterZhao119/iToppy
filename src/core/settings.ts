@@ -26,7 +26,7 @@ export interface InstancePreferences {
 }
 
 export interface ManualInstance {
-  agentType: "kimi-code" | "codex";
+  agentType: "kimi-code" | "codex" | "claude-code";
   workspacePath: string;
 }
 
@@ -65,8 +65,9 @@ export const defaultAppSettings: AppSettings = {
   alwaysOnTop: true,
   autoShowNewTasks: true,
   agents: {
-    "kimi-code": { enabled: true },
+    "kimi-code": { enabled: true, characterIdOverride: "kimi" },
     codex: { enabled: true, characterIdOverride: "gpt" },
+    "claude-code": { enabled: true, characterIdOverride: "claude" },
   },
   instances: {},
   manualInstances: [],

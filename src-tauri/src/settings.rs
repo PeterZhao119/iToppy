@@ -73,11 +73,24 @@ pub struct AppSettings {
 impl Default for AppSettings {
     fn default() -> Self {
         let mut agents = HashMap::new();
-        agents.insert("kimi-code".to_string(), AgentSettings::default());
+        agents.insert(
+            "kimi-code".to_string(),
+            AgentSettings {
+                character_id_override: Some("kimi".to_string()),
+                ..AgentSettings::default()
+            },
+        );
         agents.insert(
             "codex".to_string(),
             AgentSettings {
                 character_id_override: Some("gpt".to_string()),
+                ..AgentSettings::default()
+            },
+        );
+        agents.insert(
+            "claude-code".to_string(),
+            AgentSettings {
+                character_id_override: Some("claude".to_string()),
                 ..AgentSettings::default()
             },
         );
@@ -104,7 +117,10 @@ impl AppSettings {
         if !matches!(self.walk_speed.as_str(), "slow" | "standard" | "fast") {
             self.walk_speed = "standard".to_string();
         }
-        if !matches!(self.default_character_id.as_str(), "deepseek" | "claude" | "gpt") {
+        if !matches!(
+            self.default_character_id.as_str(),
+            "deepseek" | "claude" | "gpt" | "doubao" | "qq" | "kimi"
+        ) {
             self.default_character_id = "deepseek".to_string();
         }
     }
