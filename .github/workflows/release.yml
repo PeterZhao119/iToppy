@@ -1,0 +1,106 @@
+# Build the macOS app and publish it to GitHub Releases.
+#
+# - Pushing a v*.*.* tag (see scripts/release.sh) builds a universal
+#   (Apple Silicon + Intel) DMG and attaches it to a GitHub Release for that tag.
+#   Tags with a suffix (e.g. v0.2.0-beta.1) are published as pre-releases.
+# - Running the workflow manually (workflow_dispatch) is a dry run: it builds
+#   the same DMG and keeps it as a workflow artifact without creating a release.
+#
+# The app is ad-hoc signed, not notarized: on first launch users need to
+# right-click -> Open, or allow it under System Settings -> Privacy & Security.
+
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: macos-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+          cache: npm
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
+
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      # The tag must match the version baked into the app; scripts/release.sh
+      # bumps all of these together.
+      - name: Verify version
+        id: meta
+        run: |
+          PKG_VERSION=$(node -p "require('./package.json').version")
+          TAURI_VERSION=$(node -p "require('./src-tauri/tauri.conf.json').version")
+          CARGO_VERSION=$(grep -m1 '^version' src-tauri/Cargo.toml | sed 's/version = "\(.*\)"/\1/')
+          echo "package.json=$PKG_VERSION tauri.conf.json=$TAURI_VERSION Cargo.toml=$CARGO_VERSION"
+          if [ "$PKG_VERSION" != "$TAURI_VERSION" ] || [ "$PKG_VERSION" != "$CARGO_VERSION" ]; then
+            echo "::error::Version mismatch between package.json, tauri.conf.json and Cargo.toml — run scripts/release.sh"
+            exit 1
+          fi
+          if [ "${{ github.ref_type }}" = "tag" ] && [ "${GITHUB_REF_NAME#v}" != "$PKG_VERSION" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match app version $PKG_VERSION"
+            exit 1
+          fi
+          echo "version=$PKG_VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build app
+        run: npx tauri build --target universal-apple-darwin --bundles app,dmg
+        env:
+          # Skip the Finder (AppleScript) window styling, which needs a GUI session.
+          TAURI_BUNDLER_DMG_IGNORE_CI: "true"
+          # Ad-hoc signature: keeps the universal bundle's signature valid so
+          # macOS does not report the downloaded app as "damaged".
+          APPLE_SIGNING_IDENTITY: "-"
+
+      - name: Stage artifacts
+        run: |
+          BUNDLE=src-tauri/target/universal-apple-darwin/release/bundle
+          codesign --verify --deep --strict "$BUNDLE/macos/iToppy.app"
+          lipo -archs "$BUNDLE"/macos/iToppy.app/Contents/MacOS/*
+          mkdir -p staging
+          cp "$BUNDLE"/dmg/*.dmg staging/
+          (cd staging && shasum -a 256 *.dmg > SHA256SUMS)
+          ls -l staging
+          cat staging/SHA256SUMS
+
+      - name: Upload workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: iToppy-${{ steps.meta.outputs.version }}-macos
+          path: staging/
+          retention-days: 7
+
+      - name: Publish GitHub Release
+        if: github.ref_type == 'tag'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: staging/*
+          generate_release_notes: true
+          prerelease: ${{ contains(github.ref_name, '-') }}
