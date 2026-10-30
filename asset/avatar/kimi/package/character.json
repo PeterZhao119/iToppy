@@ -14,7 +14,7 @@
   "fps": 12,
   "columns": 6,
   "thumbnail": {
-    "path": "thumbnail.png",
+    "path": "thumbnail.webp",
     "width": 192,
     "height": 342,
     "source": "spritesheets/idle.png"
@@ -25,18 +25,135 @@
     "idle_tail_cuddle": "idle_read"
   },
   "animations": {
-    "idle": { "spritesheet": "spritesheets/idle.png", "frame_count": 24, "columns": 6, "rows": 4, "fps": 12, "duration_seconds": 2, "loop": true, "frame_order": "row_major" },
-    "walk_left": { "spritesheet": "spritesheets/walk_left.png", "frame_count": 24, "columns": 6, "rows": 4, "fps": 12, "duration_seconds": 2, "loop": true, "frame_order": "row_major" },
-    "walk_right": { "spritesheet": "spritesheets/walk_right.png", "frame_count": 24, "columns": 6, "rows": 4, "fps": 12, "duration_seconds": 2, "loop": true, "frame_order": "row_major" },
-    "running.thinking": { "spritesheet": "spritesheets/running.thinking.png", "frame_count": 24, "columns": 6, "rows": 4, "fps": 12, "duration_seconds": 2, "loop": true, "frame_order": "row_major" },
-    "running.tool_calling": { "spritesheet": "spritesheets/running.tool_calling.png", "frame_count": 24, "columns": 6, "rows": 4, "fps": 12, "duration_seconds": 2, "loop": true, "frame_order": "row_major" },
-    "running.searching": { "spritesheet": "spritesheets/running.searching.png", "frame_count": 24, "columns": 6, "rows": 4, "fps": 12, "duration_seconds": 2, "loop": true, "frame_order": "row_major" },
-    "succeeded": { "spritesheet": "spritesheets/succeeded.png", "frame_count": 24, "columns": 6, "rows": 4, "fps": 12, "duration_seconds": 2, "loop": false, "frame_order": "row_major" },
-    "failed": { "spritesheet": "spritesheets/failed.png", "frame_count": 24, "columns": 6, "rows": 4, "fps": 12, "duration_seconds": 2, "loop": false, "frame_order": "row_major" },
-    "succeeded_idle": { "spritesheet": "spritesheets/succeeded_idle.png", "frame_count": 24, "columns": 6, "rows": 4, "fps": 12, "duration_seconds": 2, "loop": true, "frame_order": "row_major" },
-    "failed_idle": { "spritesheet": "spritesheets/failed_idle.png", "frame_count": 24, "columns": 6, "rows": 4, "fps": 12, "duration_seconds": 2, "loop": true, "frame_order": "row_major" },
-    "dragging": { "spritesheet": "spritesheets/dragging.png", "frame_count": 24, "columns": 6, "rows": 4, "fps": 12, "duration_seconds": 2, "loop": true, "frame_order": "row_major" },
-    "idle_moon": { "spritesheet": "spritesheets/idle_moon.png", "frame_count": 60, "columns": 6, "rows": 10, "fps": 12, "duration_seconds": 5, "loop": true, "frame_order": "row_major" },
-    "idle_read": { "spritesheet": "spritesheets/idle_read.png", "frame_count": 60, "columns": 6, "rows": 10, "fps": 12, "duration_seconds": 5, "loop": true, "frame_order": "row_major" }
+    "idle": {
+      "spritesheet": "spritesheets/idle.webp",
+      "frame_count": 24,
+      "columns": 6,
+      "rows": 4,
+      "fps": 12,
+      "duration_seconds": 2,
+      "loop": true,
+      "frame_order": "row_major"
+    },
+    "walk_left": {
+      "spritesheet": "spritesheets/walk_left.webp",
+      "frame_count": 24,
+      "columns": 6,
+      "rows": 4,
+      "fps": 12,
+      "duration_seconds": 2,
+      "loop": true,
+      "frame_order": "row_major"
+    },
+    "walk_right": {
+      "spritesheet": "spritesheets/walk_right.webp",
+      "frame_count": 24,
+      "columns": 6,
+      "rows": 4,
+      "fps": 12,
+      "duration_seconds": 2,
+      "loop": true,
+      "frame_order": "row_major"
+    },
+    "running.thinking": {
+      "spritesheet": "spritesheets/running.thinking.webp",
+      "frame_count": 24,
+      "columns": 6,
+      "rows": 4,
+      "fps": 12,
+      "duration_seconds": 2,
+      "loop": true,
+      "frame_order": "row_major"
+    },
+    "running.tool_calling": {
+      "spritesheet": "spritesheets/running.tool_calling.webp",
+      "frame_count": 24,
+      "columns": 6,
+      "rows": 4,
+      "fps": 12,
+      "duration_seconds": 2,
+      "loop": true,
+      "frame_order": "row_major"
+    },
+    "running.searching": {
+      "spritesheet": "spritesheets/running.searching.webp",
+      "frame_count": 24,
+      "columns": 6,
+      "rows": 4,
+      "fps": 12,
+      "duration_seconds": 2,
+      "loop": true,
+      "frame_order": "row_major"
+    },
+    "succeeded": {
+      "spritesheet": "spritesheets/succeeded.webp",
+      "frame_count": 24,
+      "columns": 6,
+      "rows": 4,
+      "fps": 12,
+      "duration_seconds": 2,
+      "loop": false,
+      "frame_order": "row_major"
+    },
+    "failed": {
+      "spritesheet": "spritesheets/failed.webp",
+      "frame_count": 24,
+      "columns": 6,
+      "rows": 4,
+      "fps": 12,
+      "duration_seconds": 2,
+      "loop": false,
+      "frame_order": "row_major"
+    },
+    "succeeded_idle": {
+      "spritesheet": "spritesheets/succeeded_idle.webp",
+      "frame_count": 24,
+      "columns": 6,
+      "rows": 4,
+      "fps": 12,
+      "duration_seconds": 2,
+      "loop": true,
+      "frame_order": "row_major"
+    },
+    "failed_idle": {
+      "spritesheet": "spritesheets/failed_idle.webp",
+      "frame_count": 24,
+      "columns": 6,
+      "rows": 4,
+      "fps": 12,
+      "duration_seconds": 2,
+      "loop": true,
+      "frame_order": "row_major"
+    },
+    "dragging": {
+      "spritesheet": "spritesheets/dragging.webp",
+      "frame_count": 24,
+      "columns": 6,
+      "rows": 4,
+      "fps": 12,
+      "duration_seconds": 2,
+      "loop": true,
+      "frame_order": "row_major"
+    },
+    "idle_moon": {
+      "spritesheet": "spritesheets/idle_moon.webp",
+      "frame_count": 60,
+      "columns": 6,
+      "rows": 10,
+      "fps": 12,
+      "duration_seconds": 5,
+      "loop": true,
+      "frame_order": "row_major"
+    },
+    "idle_read": {
+      "spritesheet": "spritesheets/idle_read.webp",
+      "frame_count": 60,
+      "columns": 6,
+      "rows": 10,
+      "fps": 12,
+      "duration_seconds": 5,
+      "loop": true,
+      "frame_order": "row_major"
+    }
   }
 }

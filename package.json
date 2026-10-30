@@ -11,7 +11,8 @@
     "watch:kimi": "tsc -p tsconfig.json && node lib/watch-kimi.js",
     "tauri": "tauri",
     "desktop:dev": "tauri dev",
-    "desktop:build": "tauri build"
+    "desktop:build": "tauri build",
+    "dmg:collect": "cp src-tauri/target/release/bundle/dmg/*.dmg ."
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2.12.4",

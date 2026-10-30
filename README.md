@@ -15,6 +15,11 @@
   <a href="LICENSE">MIT</a>
 </p>
 
+## 安装使用
+- 从release获得最新版本的iToppy
+- 安装（可能需要右键）
+- 在你的ai agent里面敲一个任务，那么iToppy萌娘就会启动了
+
 ## 这是个啥？
 
 - 自动识别本地AI Agent工具～

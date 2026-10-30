@@ -14,7 +14,7 @@
   "fps": 12,
   "columns": 6,
   "thumbnail": {
-    "path": "thumbnail.png",
+    "path": "thumbnail.webp",
     "width": 192,
     "height": 342,
     "source": "spritesheets/idle.png"
@@ -24,7 +24,7 @@
   },
   "animations": {
     "idle": {
-      "spritesheet": "spritesheets/idle.png",
+      "spritesheet": "spritesheets/idle.webp",
       "frame_count": 24,
       "columns": 6,
       "rows": 4,
@@ -34,7 +34,7 @@
       "frame_order": "row_major"
     },
     "walk_left": {
-      "spritesheet": "spritesheets/walk_left.png",
+      "spritesheet": "spritesheets/walk_left.webp",
       "frame_count": 24,
       "columns": 6,
       "rows": 4,
@@ -44,7 +44,7 @@
       "frame_order": "row_major"
     },
     "walk_right": {
-      "spritesheet": "spritesheets/walk_right.png",
+      "spritesheet": "spritesheets/walk_right.webp",
       "frame_count": 24,
       "columns": 6,
       "rows": 4,
@@ -54,7 +54,7 @@
       "frame_order": "row_major"
     },
     "running.thinking": {
-      "spritesheet": "spritesheets/running.thinking.png",
+      "spritesheet": "spritesheets/running.thinking.webp",
       "frame_count": 24,
       "columns": 6,
       "rows": 4,
@@ -64,7 +64,7 @@
       "frame_order": "row_major"
     },
     "running.tool_calling": {
-      "spritesheet": "spritesheets/running.tool_calling.png",
+      "spritesheet": "spritesheets/running.tool_calling.webp",
       "frame_count": 24,
       "columns": 6,
       "rows": 4,
@@ -74,7 +74,7 @@
       "frame_order": "row_major"
     },
     "running.searching": {
-      "spritesheet": "spritesheets/searching.png",
+      "spritesheet": "spritesheets/searching.webp",
       "frame_count": 24,
       "columns": 6,
       "rows": 4,
@@ -84,7 +84,7 @@
       "frame_order": "row_major"
     },
     "succeeded": {
-      "spritesheet": "spritesheets/succeeded.png",
+      "spritesheet": "spritesheets/succeeded.webp",
       "frame_count": 24,
       "columns": 6,
       "rows": 4,
@@ -94,7 +94,7 @@
       "frame_order": "row_major"
     },
     "failed": {
-      "spritesheet": "spritesheets/failed.png",
+      "spritesheet": "spritesheets/failed.webp",
       "frame_count": 24,
       "columns": 6,
       "rows": 4,
@@ -104,7 +104,7 @@
       "frame_order": "row_major"
     },
     "succeeded_idle": {
-      "spritesheet": "spritesheets/succeeded_idle.png",
+      "spritesheet": "spritesheets/succeeded_idle.webp",
       "frame_count": 24,
       "columns": 6,
       "rows": 4,
@@ -114,7 +114,7 @@
       "frame_order": "row_major"
     },
     "failed_idle": {
-      "spritesheet": "spritesheets/failed_idle.png",
+      "spritesheet": "spritesheets/failed_idle.webp",
       "frame_count": 24,
       "columns": 6,
       "rows": 4,
@@ -124,7 +124,7 @@
       "frame_order": "row_major"
     },
     "dragging": {
-      "spritesheet": "spritesheets/dragging.png",
+      "spritesheet": "spritesheets/dragging.webp",
       "frame_count": 24,
       "columns": 6,
       "rows": 4,
@@ -134,7 +134,7 @@
       "frame_order": "row_major"
     },
     "idle_adjust_skirt": {
-      "spritesheet": "spritesheets/idle_adjust_skirt.png",
+      "spritesheet": "spritesheets/idle_adjust_skirt.webp",
       "frame_count": 60,
       "columns": 6,
       "rows": 10,
@@ -144,7 +144,7 @@
       "frame_order": "row_major"
     },
     "idle_tail_cuddle": {
-      "spritesheet": "spritesheets/idle_tail_cuddle.png",
+      "spritesheet": "spritesheets/idle_tail_cuddle.webp",
       "frame_count": 60,
       "columns": 6,
       "rows": 10,
