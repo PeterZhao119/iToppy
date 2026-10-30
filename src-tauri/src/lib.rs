@@ -1,3 +1,4 @@
+mod codex_app;
 mod menu;
 mod settings;
 mod watcher;
@@ -426,6 +427,9 @@ pub fn run() {
                 let _ = handle.emit("kimi-monitor-error", error);
             }
             if let Err(error) = watcher::start_codex(handle.clone()) {
+                let _ = handle.emit("codex-monitor-error", error);
+            }
+            if let Err(error) = codex_app::start(handle.clone()) {
                 let _ = handle.emit("codex-monitor-error", error);
             }
             if let Err(error) = watcher::start_claude(handle.clone()) {

@@ -170,7 +170,9 @@ export class SourceInstanceRuntime {
   }
 
   private preferences(instanceId: string): InstancePreferences {
-    return this.settings.instances[instanceId] ?? {};
+    const direct = this.settings.instances[instanceId];
+    if (direct !== undefined) return direct;
+    return legacyCodexPreferences(this.settings.instances, instanceId) ?? {};
   }
 
   private snapshot(record: InstanceRecord): SourceInstanceSnapshot {
@@ -247,4 +249,20 @@ function settingsOverride(preferences: InstancePreferences): InstanceSettingsOve
     resultBubbleEnabled: preferences.resultBubbleEnabledOverride,
     alwaysOnTop: preferences.alwaysOnTopOverride,
   }).filter(([, value]) => value !== undefined && value !== null)) as InstanceSettingsOverride;
+}
+
+// 迁移垫片：旧版本 Codex 实例 ID 带来源段（codex:cli:/path 等），现已归一为 codex:/path。
+// 旧 settings.json 里按来源段存储的实例偏好（如 hidden）按 cwd 迁移查询，避免升级后用户设置失效。
+function legacyCodexPreferences(
+  instances: Record<string, InstancePreferences>,
+  instanceId: string,
+): InstancePreferences | undefined {
+  if (!instanceId.startsWith("codex:")) return undefined;
+  const cwd = instanceId.slice("codex:".length);
+  if (cwd === "" || /^(cli|vscode|app):/.test(cwd)) return undefined;
+  for (const kind of ["cli", "vscode", "app"]) {
+    const legacy = instances[`codex:${kind}:${cwd}`];
+    if (legacy !== undefined) return legacy;
+  }
+  return undefined;
 }

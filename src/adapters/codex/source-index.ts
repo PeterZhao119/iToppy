@@ -110,7 +110,8 @@ export class CodexSessionIndex {
       : source === "app" ? `Codex App · ${workspaceName}` : `Codex CLI · ${workspaceName}`;
     return {
       agentType: "codex",
-      instanceId: `codex:${source}:${metadata.cwd}`,
+      // 实例按工作区聚合（与 Codex App SQLite 源共用同一 ID），来源段只影响宿主/导航/名称。
+      instanceId: `codex:${metadata.cwd}`,
       hostKind,
       displayName,
       navigation: {
@@ -157,10 +158,12 @@ export function codexSessionIdFromPath(path: string): string {
     name.replace(/^rollout-/, "").replace(/\.jsonl$/, "");
 }
 
-function sourceKind(metadata: CodexSessionMetadata): "vscode" | "app" | "cli" {
+export function sourceKind(metadata: CodexSessionMetadata): "vscode" | "app" | "cli" {
   const source = metadata.source.toLowerCase();
   const originator = metadata.originator.toLowerCase();
-  if (source === "vscode" || originator.includes("vscode")) return "vscode";
+  // App-server 会被注入 CODEX_INTERNAL_ORIGINATOR_OVERRIDE=codex_vscode，
+  // 因此必须先判 app/desktop，再判 vscode，否则 app 会话被误判为 VS Code。
   if (source === "app" || source === "desktop" || originator.includes("desktop")) return "app";
+  if (source === "vscode" || originator.includes("vscode")) return "vscode";
   return "cli";
 }

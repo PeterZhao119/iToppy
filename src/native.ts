@@ -5,6 +5,13 @@ import { getCurrentWindow, PhysicalPosition } from "@tauri-apps/api/window";
 import { WebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { ClaudeJsonlParser } from "./adapters/claude-code/jsonl.js";
 import { ClaudeSessionIndex, claudeSessionIdFromPath } from "./adapters/claude-code/source-index.js";
+import {
+  CodexAppItemsParser,
+  CodexAppThreadIndex,
+  codexAppThreadShadowed,
+  codexRolloutFeedsSession,
+  type CodexAppDbPayload,
+} from "./adapters/codex/app-db.js";
 import { CodexRolloutParser } from "./adapters/codex/rollout.js";
 import { CodexSessionIndex, codexSessionIdFromPath } from "./adapters/codex/source-index.js";
 import { KimiSessionIndex } from "./adapters/kimi-code/source-index.js";
@@ -29,6 +36,11 @@ interface ParserCursor {
   sourceInstance?: AgentEvent["sourceInstance"];
 }
 
+interface AppParserCursor {
+  parser: CodexAppItemsParser;
+  sourceInstance?: AgentEvent["sourceInstance"];
+}
+
 interface NativeDragSession {
   origin: PhysicalPosition;
   startX: number;
@@ -46,6 +58,9 @@ let assignedInstanceId = query.get("instance");
 const isMainWindow = assignedInstanceId === null;
 const createdInstances = new Set<string>();
 const parsers = new Map<string, ParserCursor>();
+const appParsers = new Map<string, AppParserCursor>();
+// 已被 rollout 管道喂过有效事件的 codex session（uuid == threads.id）；SQLite 管道对它们闭嘴。
+const rolloutFedSessions = new Set<string>();
 const settleTimers = new Map<string, ReturnType<typeof setTimeout>>();
 let view: PetView | undefined;
 let walkOrigin: PhysicalPosition | undefined;
@@ -79,6 +94,7 @@ runtime.configure(appSettings);
 const host = new TauriReadHost(home, kimiHome, codexHome, claudeHome);
 const sessionIndex = new KimiSessionIndex(host, kimiHome);
 const codexIndex = new CodexSessionIndex(host, codexHome);
+const codexAppIndex = new CodexAppThreadIndex(host, codexHome);
 const claudeIndex = new ClaudeSessionIndex(host, claudeHome);
 
 const options = {
@@ -228,10 +244,11 @@ async function publishNativeState(snapshots: SourceInstanceSnapshot[]): Promise<
 }
 
 async function rescanInstances(): Promise<void> {
-  await Promise.all([sessionIndex.refresh(), codexIndex.refresh(), claudeIndex.refresh()]);
+  await Promise.all([sessionIndex.refresh(), codexIndex.refresh(), claudeIndex.refresh(), codexAppIndex.refresh()]);
   for (const instance of sessionIndex.discoveredInstances()) runtime.register(instance);
   for (const instance of codexIndex.discoveredInstances()) runtime.register(instance);
   for (const instance of claudeIndex.discoveredInstances()) runtime.register(instance);
+  for (const instance of codexAppIndex.discoveredInstances()) runtime.register(instance);
   for (const manual of appSettings.manualInstances) {
     if (manual.agentType === "codex") runtime.register(codexIndex.manualInstance(manual.workspacePath));
     else if (manual.agentType === "claude-code") runtime.register(claudeIndex.manualInstance(manual.workspacePath));
@@ -294,7 +311,10 @@ async function handleCodexAppend(payload: WireAppend): Promise<void> {
     };
     parsers.set(payload.path, cursor);
   }
-  applyParsedEvents(payload.content, cursor, sourceInstance);
+  if (sourceInstance !== undefined) cursor.sourceInstance = sourceInstance;
+  const events = cursor.parser.parse(payload.content);
+  if (codexRolloutFeedsSession(events)) rolloutFedSessions.add(sessionId);
+  applyAgentEvents(events, cursor);
 }
 
 async function handleClaudeAppend(payload: WireAppend): Promise<void> {
@@ -322,7 +342,14 @@ function applyParsedEvents(
   sourceInstance: AgentEvent["sourceInstance"],
 ): void {
   if (sourceInstance !== undefined) cursor.sourceInstance = sourceInstance;
-  for (const event of cursor.parser.parse(content)) {
+  applyAgentEvents(cursor.parser.parse(content), cursor);
+}
+
+function applyAgentEvents(
+  events: AgentEvent[],
+  cursor: { sourceInstance?: AgentEvent["sourceInstance"] },
+): void {
+  for (const event of events) {
     apply({
       ...event,
       instanceId: cursor.sourceInstance?.instanceId,
@@ -334,6 +361,45 @@ function applyParsedEvents(
         appBundleId: cursor.sourceInstance?.navigation.appBundleId,
       },
     });
+  }
+}
+
+function appParserFor(threadId: string): AppParserCursor {
+  let cursor = appParsers.get(threadId);
+  if (cursor === undefined) {
+    const sourceInstance = codexAppIndex.sourceFor(threadId);
+    cursor = {
+      parser: new CodexAppItemsParser({
+        agentType: "codex",
+        sessionId: threadId,
+        workspacePath: sourceInstance?.navigation.workspacePath,
+      }),
+      sourceInstance,
+    };
+    appParsers.set(threadId, cursor);
+  }
+  const sourceInstance = codexAppIndex.sourceFor(threadId);
+  if (sourceInstance !== undefined) cursor.sourceInstance = sourceInstance;
+  return cursor;
+}
+
+function handleCodexAppDb(payload: CodexAppDbPayload): void {
+  const changedThreads = codexAppIndex.applyThreads(payload.threads);
+  for (const threadId of changedThreads) {
+    const instance = codexAppIndex.sourceFor(threadId);
+    if (instance !== undefined) runtime.register(instance);
+  }
+  for (const item of payload.items) {
+    // 同一会话已被 rollout 管道喂过（本机 app-server 双写形态）：SQLite 管道跳过事件转发，
+    // 2026.2.6「rollout 只有 meta」形态下该 thread 不在 Set 中，SQLite 管道自然接管。
+    if (codexAppThreadShadowed(rolloutFedSessions, item.thread_id)) continue;
+    const cursor = appParserFor(item.thread_id);
+    applyAgentEvents(cursor.parser.parseItem(item), cursor);
+  }
+  for (const turn of payload.turns) {
+    if (codexAppThreadShadowed(rolloutFedSessions, turn.thread_id)) continue;
+    const cursor = appParserFor(turn.thread_id);
+    applyAgentEvents(cursor.parser.parseTurn(turn), cursor);
   }
 }
 
@@ -349,6 +415,9 @@ await listen<WireAppend>("kimi-wire", (event) => {
 });
 await listen<WireAppend>("codex-rollout", (event) => {
   if (isMainWindow) void handleCodexAppend(event.payload).catch(showError);
+});
+await listen<CodexAppDbPayload>("codex-app-db", (event) => {
+  if (isMainWindow) handleCodexAppDb(event.payload);
 });
 await listen<WireAppend>("claude-jsonl", (event) => {
   if (isMainWindow) void handleClaudeAppend(event.payload).catch(showError);
