@@ -48,6 +48,12 @@ Codex 和 Claude Code 的各本地 Coding 形态分别共用数据适配器，�
 
 完整清单见 [Agent 适配器登记表](design/agent-adapter-registry.md)。
 
+## 下载安装
+
+到 [Releases](https://github.com/PeterZhao119/iToppy/releases) 下载最新的 `iToppy_<版本>_universal.dmg`（同时支持 Apple Silicon 和 Intel），拖进「应用程序」即可。
+
+App 暂未经过 Apple 公证，首次打开会被系统拦下：在 Finder 里右键 iToppy →「打开」，或到「系统设置 → 隐私与安全性」里点「仍要打开」。
+
 ## 跑起来
 
 要求：macOS 11+、Node.js、Rust，以及一颗愿意养桌宠的心。
@@ -70,6 +76,16 @@ src-tauri/target/release/bundle/macos/iToppy.app
 ```
 
 这是 Tauri 2 + Rust + TypeScript 的原生桌面应用，不是披着桌面外衣的浏览器首页。
+
+## 发布新版本
+
+```bash
+./scripts/release.sh
+```
+
+脚本会选好新版本号，同步改掉 `package.json`、`package-lock.json`、`src-tauri/tauri.conf.json`、`src-tauri/Cargo.toml`、`src-tauri/Cargo.lock`，提交并推送 `v<版本>` 标签。标签推上去后 GitHub Actions（[`release.yml`](.github/workflows/release.yml)）会打出 universal DMG，发到本仓库的 Releases；带后缀的版本（如 `0.2.0-beta.1`）发成预发布。
+
+在 Actions 页面手动运行 Release 工作流只打包、不发布，产物在该次运行的 Artifacts 里，可用来提前验证打包。
 
 ## 隐私与权限
 
