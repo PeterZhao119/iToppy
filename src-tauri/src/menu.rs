@@ -36,6 +36,8 @@ pub struct InstanceSettings {
     pub walk_enabled: bool,
     pub walk_speed: String,
     pub result_bubble_enabled: bool,
+    pub sound_enabled: bool,
+    pub click_through_enabled: bool,
     pub always_on_top: bool,
 }
 
@@ -248,6 +250,24 @@ fn instance_items<R: Runtime>(
         None::<&str>,
     )?));
 
+    items.push(MenuItemKind::Check(CheckMenuItem::with_id(
+        app,
+        action_id("toggle-sound", id),
+        "音效",
+        true,
+        state.settings.sound_enabled,
+        None::<&str>,
+    )?));
+
+    items.push(MenuItemKind::Check(CheckMenuItem::with_id(
+        app,
+        action_id("toggle-click-through", id),
+        "点击穿透",
+        true,
+        state.settings.click_through_enabled,
+        None::<&str>,
+    )?));
+
     let walk = Submenu::new(app, "游走设置", true)?;
     walk.append(&CheckMenuItem::with_id(
         app,
@@ -343,6 +363,14 @@ pub fn handle_menu_event(app: &AppHandle, event: tauri::menu::MenuEvent) {
                 "toggle-bubble" => {
                     preferences.result_bubble_enabled_override =
                         Some(!snapshot.settings.result_bubble_enabled);
+                }
+                "toggle-sound" => {
+                    preferences.sound_enabled_override =
+                        Some(!snapshot.settings.sound_enabled);
+                }
+                "toggle-click-through" => {
+                    preferences.click_through_enabled_override =
+                        Some(!snapshot.settings.click_through_enabled);
                 }
                 "toggle-walk" => {
                     preferences.walk_enabled_override = Some(!snapshot.settings.walk_enabled);

@@ -71,6 +71,8 @@ export interface InstanceSettings {
   walkEnabled: boolean;
   walkSpeed: WalkSpeed;
   resultBubbleEnabled: boolean;
+  soundEnabled: boolean;
+  clickThroughEnabled: boolean;
   alwaysOnTop: boolean;
 }
 

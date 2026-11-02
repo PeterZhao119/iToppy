@@ -18,6 +18,8 @@ pub struct AgentSettings {
     pub walk_enabled_override: Option<bool>,
     pub walk_speed_override: Option<String>,
     pub result_bubble_enabled_override: Option<bool>,
+    pub sound_enabled_override: Option<bool>,
+    pub click_through_enabled_override: Option<bool>,
     pub always_on_top_override: Option<bool>,
 }
 
@@ -29,6 +31,8 @@ impl Default for AgentSettings {
             walk_enabled_override: None,
             walk_speed_override: None,
             result_bubble_enabled_override: None,
+            sound_enabled_override: None,
+            click_through_enabled_override: None,
             always_on_top_override: None,
         }
     }
@@ -41,6 +45,8 @@ pub struct InstancePreferences {
     pub walk_enabled_override: Option<bool>,
     pub walk_speed_override: Option<String>,
     pub result_bubble_enabled_override: Option<bool>,
+    pub sound_enabled_override: Option<bool>,
+    pub click_through_enabled_override: Option<bool>,
     pub always_on_top_override: Option<bool>,
     pub visible: Option<bool>,
     pub monitoring_enabled: Option<bool>,
@@ -63,6 +69,8 @@ pub struct AppSettings {
     pub walk_enabled: bool,
     pub walk_speed: String,
     pub result_bubble_enabled: bool,
+    pub sound_enabled: bool,
+    pub click_through_enabled: bool,
     pub always_on_top: bool,
     pub auto_show_new_tasks: bool,
     pub agents: HashMap<String, AgentSettings>,
@@ -101,6 +109,8 @@ impl Default for AppSettings {
             walk_enabled: true,
             walk_speed: "standard".to_string(),
             result_bubble_enabled: true,
+            sound_enabled: true,
+            click_through_enabled: false,
             always_on_top: true,
             auto_show_new_tasks: true,
             agents,
@@ -134,6 +144,8 @@ pub struct AppSettingsPatch {
     pub walk_enabled: Option<bool>,
     pub walk_speed: Option<String>,
     pub result_bubble_enabled: Option<bool>,
+    pub sound_enabled: Option<bool>,
+    pub click_through_enabled: Option<bool>,
     pub always_on_top: Option<bool>,
     pub auto_show_new_tasks: Option<bool>,
     pub agents: Option<HashMap<String, AgentSettings>>,

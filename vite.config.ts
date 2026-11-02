@@ -19,6 +19,7 @@ export default defineConfig({
           });
         }
         await cp("asset/brand", "dist/asset/brand", { recursive: true });
+        await cp("asset/audio", "dist/asset/audio", { recursive: true });
       },
     },
   ],

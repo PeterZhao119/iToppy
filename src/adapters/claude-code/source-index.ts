@@ -135,9 +135,11 @@ export function claudeSessionIdFromPath(path: string): string {
   return (path.split(/[\\/]/).at(-1) ?? path).replace(/\.jsonl$/, "");
 }
 
-function sourceKind(entrypoint: string): "vscode" | "app" | "cli" {
+export function sourceKind(entrypoint: string): "vscode" | "app" | "cli" {
   const normalized = entrypoint.toLowerCase();
-  if (normalized.includes("vscode") || normalized.includes("ide")) return "vscode";
+  // 先判 desktop 再判 vscode/ide：与 codex 的 sourceKind 顺序修正同理，
+  // 防止 "claude-ide-desktop" 之类同时含两类关键字的 entrypoint 被误判。
   if (normalized.includes("desktop")) return "app";
+  if (normalized.includes("vscode") || normalized.includes("ide")) return "vscode";
   return "cli";
 }

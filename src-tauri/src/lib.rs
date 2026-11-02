@@ -1,4 +1,5 @@
 mod codex_app;
+mod hit_region;
 mod menu;
 mod settings;
 mod watcher;
@@ -194,6 +195,12 @@ fn update_app_settings(
         if let Some(value) = patch.result_bubble_enabled {
             settings.result_bubble_enabled = value;
         }
+        if let Some(value) = patch.sound_enabled {
+            settings.sound_enabled = value;
+        }
+        if let Some(value) = patch.click_through_enabled {
+            settings.click_through_enabled = value;
+        }
         if let Some(value) = patch.always_on_top {
             settings.always_on_top = value;
         }
@@ -356,6 +363,7 @@ fn set_pet_always_on_top(window: WebviewWindow, always_on_top: bool) -> Result<(
 
 #[tauri::command]
 fn close_pet_window(app: AppHandle, label: String) -> Result<(), String> {
+    hit_region::forget_window(&app, &label);
     if let Some(window) = app.get_webview_window(&label) {
         window.close().map_err(|error| error.to_string())?;
     }
@@ -393,6 +401,7 @@ pub fn run() {
             set_pet_position,
             set_pet_always_on_top,
             close_pet_window,
+            hit_region::update_hit_region,
             menu::show_pet_context_menu,
             menu::open_control_panel
         ])

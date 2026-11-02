@@ -48,6 +48,8 @@ export function nativeInstanceFromSnapshot(snapshot: SourceInstanceSnapshot): Na
       walkEnabled: snapshot.settings.walkEnabled ?? true,
       walkSpeed: snapshot.settings.walkSpeed ?? "standard",
       resultBubbleEnabled: snapshot.settings.resultBubbleEnabled ?? true,
+      soundEnabled: snapshot.settings.soundEnabled ?? true,
+      clickThroughEnabled: snapshot.settings.clickThroughEnabled ?? false,
       alwaysOnTop: snapshot.settings.alwaysOnTop ?? true,
     },
     monitorHealth: snapshot.primary?.monitorHealth,

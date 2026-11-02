@@ -104,7 +104,7 @@ export class CodexSessionIndex {
       : source === "app" ? "app" : "terminal-session";
     const appBundleId = source === "vscode"
       ? "com.microsoft.VSCode"
-      : source === "app" ? "com.openai.chat" : "com.apple.Terminal";
+      : source === "app" ? "com.openai.codex" : "com.apple.Terminal";
     const displayName = source === "vscode"
       ? `Codex · ${workspaceName}`
       : source === "app" ? `Codex App · ${workspaceName}` : `Codex CLI · ${workspaceName}`;

@@ -2,7 +2,7 @@ import "./native.css";
 import { invoke } from "@tauri-apps/api/core";
 import { emit, listen } from "@tauri-apps/api/event";
 import { getCurrentWindow, PhysicalPosition } from "@tauri-apps/api/window";
-import { WebviewWindow } from "@tauri-apps/api/webviewWindow";
+import { getCurrentWebviewWindow, WebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { ClaudeJsonlParser } from "./adapters/claude-code/jsonl.js";
 import { ClaudeSessionIndex, claudeSessionIdFromPath } from "./adapters/claude-code/source-index.js";
 import {
@@ -22,6 +22,8 @@ import { normalizeSettings, type AppSettings } from "./core/settings.js";
 import { loadCharacterDefinition } from "./characters/definition-loader.js";
 import { SpriteRenderer } from "./characters/sprite-renderer.js";
 import { TauriReadHost } from "./platform/tauri-read-host.js";
+import { playStateSound, type StateSound } from "./platform/sound.js";
+import { rectsEqual, toRegion, type HitRect } from "./platform/hit-region.js";
 import { nativeInstanceFromSnapshot } from "./platform/native-contract.js";
 import type { InstanceAction, NativeRuntimeState } from "./platform/native-contract.js";
 import { PetView, type OffsetBounds } from "./ui/pet-view.js";
@@ -41,17 +43,29 @@ interface AppParserCursor {
   sourceInstance?: AgentEvent["sourceInstance"];
 }
 
+interface DragAreaBounds {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
 interface NativeDragSession {
   origin: PhysicalPosition;
   startX: number;
   startY: number;
   scale: number;
+  /** 工作区逻辑坐标，松手时用于"完全出屏则落回"保护。 */
+  bounds?: DragAreaBounds;
+  lastX: number;
+  lastY: number;
 }
 
 const appElement = document.querySelector<HTMLElement>("#app");
 if (appElement === null) throw new Error("Missing #app.");
 const app = appElement;
 const currentWindow = getCurrentWindow();
+const currentWindowLabel = getCurrentWebviewWindow().label;
 const runtime = new SourceInstanceRuntime();
 const query = new URLSearchParams(window.location.search);
 let assignedInstanceId = query.get("instance");
@@ -66,6 +80,10 @@ let view: PetView | undefined;
 let walkOrigin: PhysicalPosition | undefined;
 let walkBounds: OffsetBounds | undefined;
 let dragSession: NativeDragSession | undefined;
+let dragging = false;
+let clickThroughEnabled = true;
+let lastHitRegion: HitRect | undefined;
+let hitRegionTimer: number | undefined;
 let walkScale = 1;
 let lastMoveAt = 0;
 let monitorError: string | undefined;
@@ -73,6 +91,7 @@ let appSettings: AppSettings;
 let positionedInstanceId: string | undefined;
 let positionSaveTimer: ReturnType<typeof setTimeout> | undefined;
 let nativeStateVersion = 0;
+let previousPrimaryState: string | undefined;
 
 const characterIds = ["deepseek", "claude", "gpt", "doubao", "qq", "kimi"] as const;
 type CharacterId = (typeof characterIds)[number];
@@ -132,35 +151,113 @@ const options = {
   onDragStart: (screenX: number, screenY: number) => {
     walkOrigin = undefined;
     walkBounds = undefined;
+    dragging = true;
+    reportDragHitRegion();
     void Promise.all([
       invoke<[number, number]>("get_pet_position"),
       invoke<number>("get_scale_factor"),
-    ]).then(([position, scale]) => {
+      invoke<[number, number, number, number]>("get_pet_bounds"),
+    ]).then(([position, scale, bounds]) => {
       dragSession = {
         origin: new PhysicalPosition(position[0], position[1]),
         startX: screenX,
         startY: screenY,
         scale,
+        bounds: {
+          x: bounds[0] / scale,
+          y: bounds[1] / scale,
+          w: bounds[2] / scale,
+          h: bounds[3] / scale,
+        },
+        lastX: screenX,
+        lastY: screenY,
       };
     }).catch(showError);
   },
   onDragEnd: () => {
+    dragging = false;
+    const session = dragSession;
+    let finalLogical: { x: number; y: number } | undefined;
+    if (session !== undefined) {
+      // 松手保护：若窗口已完全推出工作区上沿（整窗不可见/抓不回），
+      // 落回到整只可见的位置（窗口顶部对齐工作区顶部）。
+      let top = session.origin.y / session.scale + (session.lastY - session.startY);
+      const bounds = session.bounds;
+      if (bounds !== undefined && top + window.innerHeight < bounds.y + 20) {
+        top = bounds.y;
+        const y = session.origin.y + (top - session.origin.y / session.scale) * session.scale;
+        void invoke("set_pet_position", {
+          x: session.origin.x + (session.lastX - session.startX) * session.scale,
+          y,
+        }).catch(showError);
+      }
+      // 直接持久化修正后的逻辑坐标，避免读回竞态把屏外位置存下来。
+      finalLogical = {
+        x: session.origin.x / session.scale + (session.lastX - session.startX),
+        y: top,
+      };
+    }
     dragSession = undefined;
-    void persistPosition();
+    reportInteractiveHitRegion();
+    void persistPosition(finalLogical);
   },
   getOffsetBounds: () => walkBounds,
 };
 
 window.addEventListener("pointermove", (event) => {
   if (dragSession === undefined) return;
+  dragSession.lastX = event.screenX;
+  dragSession.lastY = event.screenY;
   const x = dragSession.origin.x + (event.screenX - dragSession.startX) * dragSession.scale;
   const y = dragSession.origin.y + (event.screenY - dragSession.startY) * dragSession.scale;
   void invoke("set_pet_position", { x, y }).catch(showError);
 });
 
+// 滚轮微移：悬停桌宠时滚轮上下移动（Shift+滚轮左右），无顶部上限。
+// 拖动受"光标无法走出屏幕"的物理钳制，滚轮不受此限，用来把桌宠推到任意高度。
+const NUDGE_STEP = 18;
+window.addEventListener("wheel", (event) => {
+  if (dragSession !== undefined || view === undefined) return;
+  if (event.deltaY === 0) return;
+  const step = (event.deltaY > 0 ? 1 : -1) * NUDGE_STEP;
+  const dx = event.shiftKey ? step : 0;
+  const dy = event.shiftKey ? 0 : step;
+  void Promise.all([
+    invoke<[number, number]>("get_pet_position"),
+    invoke<number>("get_scale_factor"),
+  ]).then(([position, scale]) => {
+    const x = position[0] + dx * scale;
+    const y = position[1] + dy * scale;
+    void invoke("set_pet_position", { x, y }).catch(showError);
+    schedulePositionSave(x / scale, y / scale);
+  }).catch(showError);
+}, { passive: true });
+
+function reportHitRegion(rect: HitRect | undefined): void {
+  const region = clickThroughEnabled ? toRegion(rect) : undefined;
+  if (rectsEqual(region, lastHitRegion)) return;
+  lastHitRegion = region;
+  void invoke("update_hit_region", { label: currentWindowLabel, region }).catch(showError);
+}
+
+function reportInteractiveHitRegion(): void {
+  reportHitRegion(view?.getInteractiveRect());
+}
+
+function reportDragHitRegion(): void {
+  // 拖动期间上报整窗区域：hitTest 不穿透，指针即使移到透明区也稳定跟手。
+  reportHitRegion({ x: 0, y: 0, w: window.innerWidth, h: window.innerHeight });
+}
+
 function render(snapshot: SourceInstanceSnapshot): void {
   if (assignedInstanceId === null) assignedInstanceId = snapshot.instance.instanceId;
   if (snapshot.instance.instanceId !== assignedInstanceId) return;
+  const primaryState = snapshot.primary?.state ?? "idle";
+  const sound = stateTransitionSound(previousPrimaryState, primaryState);
+  if (sound !== undefined) {
+    playStateSound(snapshot.settings.characterId, sound, snapshot.settings.soundEnabled);
+  }
+  previousPrimaryState = primaryState;
   const characterId = resolveCharacterId(snapshot.settings.characterId);
   if (view !== undefined && currentCharacterId !== characterId) {
     view.destroy();
@@ -182,6 +279,13 @@ function render(snapshot: SourceInstanceSnapshot): void {
   void invoke("set_pet_always_on_top", {
     alwaysOnTop: snapshot.settings.alwaysOnTop ?? true,
   }).catch(showError);
+  clickThroughEnabled = snapshot.settings.clickThroughEnabled ?? false;
+  if (hitRegionTimer === undefined) {
+    hitRegionTimer = window.setInterval(() => {
+      if (!dragging) reportInteractiveHitRegion();
+    }, 500);
+  }
+  reportInteractiveHitRegion();
   if (positionedInstanceId !== snapshot.instance.instanceId) {
     positionedInstanceId = snapshot.instance.instanceId;
     void restorePosition(snapshot.instance.instanceId);
@@ -196,8 +300,10 @@ function sync(): void {
   if (assignedInstanceId !== null && !snapshots.some((snapshot) => snapshot.instance.instanceId === assignedInstanceId)) {
     assignedInstanceId = null;
     positionedInstanceId = undefined;
+    previousPrimaryState = undefined;
     view?.destroy();
     view = undefined;
+    reportHitRegion(undefined);
     void currentWindow.hide();
   }
   if (assignedInstanceId === null && snapshots[0] !== undefined) {
@@ -505,9 +611,13 @@ async function restorePosition(instanceId: string): Promise<void> {
   await invoke("set_pet_position", { x: position.x * scale, y: position.y * scale });
 }
 
-async function persistPosition(): Promise<void> {
+async function persistPosition(logical?: { x: number; y: number }): Promise<void> {
   if (assignedInstanceId === null) return;
   const instanceId = assignedInstanceId;
+  if (logical !== undefined) {
+    await invoke("save_pet_position", { instanceId, x: logical.x, y: logical.y });
+    return;
+  }
   const [position, scale] = await Promise.all([
     invoke<[number, number]>("get_pet_position"),
     invoke<number>("get_scale_factor"),
@@ -530,6 +640,16 @@ function schedulePositionSave(x: number, y: number): void {
 
 function resolveCharacterId(value: string): CharacterId {
   return characterIds.includes(value as CharacterId) ? value as CharacterId : "deepseek";
+}
+
+function stateTransitionSound(previous: string | undefined, current: string): StateSound | undefined {
+  if (previous === undefined || previous === current) return undefined;
+  if (current === "running") return "start";
+  if (previous !== "running") return undefined;
+  if (current === "succeeded") return "succeeded";
+  if (current === "failed") return "failed";
+  if (current === "idle") return "interrupted";
+  return undefined;
 }
 
 function windowLabel(instanceId: string): string {

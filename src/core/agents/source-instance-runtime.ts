@@ -27,6 +27,8 @@ export const defaultInstanceSettings: InstanceSettings = {
   walkEnabled: true,
   walkSpeed: "standard",
   resultBubbleEnabled: true,
+  soundEnabled: true,
+  clickThroughEnabled: false,
   alwaysOnTop: true,
 };
 
@@ -42,6 +44,8 @@ export class SourceInstanceRuntime {
       walkEnabled: appDefaults.walkEnabled,
       walkSpeed: appDefaults.walkSpeed,
       resultBubbleEnabled: appDefaults.resultBubbleEnabled,
+      soundEnabled: appDefaults.soundEnabled,
+      clickThroughEnabled: appDefaults.clickThroughEnabled,
       alwaysOnTop: appDefaults.alwaysOnTop,
     });
   }
@@ -182,6 +186,8 @@ export class SourceInstanceRuntime {
       walkEnabled: agent?.walkEnabledOverride,
       walkSpeed: agent?.walkSpeedOverride,
       resultBubbleEnabled: agent?.resultBubbleEnabledOverride,
+      soundEnabled: agent?.soundEnabledOverride,
+      clickThroughEnabled: agent?.clickThroughEnabledOverride,
       alwaysOnTop: agent?.alwaysOnTopOverride,
     };
     const definedAgentDefaults = Object.fromEntries(
@@ -206,6 +212,8 @@ export class SourceInstanceRuntime {
         walkEnabled: this.settings.walkEnabled,
         walkSpeed: this.settings.walkSpeed,
         resultBubbleEnabled: this.settings.resultBubbleEnabled,
+        soundEnabled: this.settings.soundEnabled,
+        clickThroughEnabled: this.settings.clickThroughEnabled,
         alwaysOnTop: this.settings.alwaysOnTop,
         ...definedAgentDefaults,
         ...record.settingsOverride,
@@ -247,6 +255,8 @@ function settingsOverride(preferences: InstancePreferences): InstanceSettingsOve
     walkEnabled: preferences.walkEnabledOverride,
     walkSpeed: preferences.walkSpeedOverride,
     resultBubbleEnabled: preferences.resultBubbleEnabledOverride,
+    soundEnabled: preferences.soundEnabledOverride,
+    clickThroughEnabled: preferences.clickThroughEnabledOverride,
     alwaysOnTop: preferences.alwaysOnTopOverride,
   }).filter(([, value]) => value !== undefined && value !== null)) as InstanceSettingsOverride;
 }

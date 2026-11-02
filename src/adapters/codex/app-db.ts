@@ -118,7 +118,7 @@ export class CodexAppThreadIndex {
     });
     const workspaceName = cwd.split(/[\\/]/).filter(Boolean).at(-1) ?? cwd;
     const hostKind = kind === "vscode" ? "vscode-workspace" : "app";
-    const appBundleId = kind === "vscode" ? "com.microsoft.VSCode" : "com.openai.chat";
+    const appBundleId = kind === "vscode" ? "com.microsoft.VSCode" : "com.openai.codex";
     return {
       agentType: "codex",
       // 与 rollout 源归一为同一工作区实例（多来源共享 thread/session id）。

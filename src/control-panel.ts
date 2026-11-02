@@ -79,6 +79,8 @@ function render(): void {
         <label>默认游走速度<select data-setting="walkSpeed">${speedOptions(settings.walkSpeed)}</select></label>
         ${checkbox("新任务自动显示", "autoShowNewTasks", settings.autoShowNewTasks)}
         ${checkbox("默认结果气泡", "resultBubbleEnabled", settings.resultBubbleEnabled)}
+        ${checkbox("默认音效", "soundEnabled", settings.soundEnabled)}
+        ${checkbox("默认点击穿透", "clickThroughEnabled", settings.clickThroughEnabled)}
         ${checkbox("默认启用游走", "walkEnabled", settings.walkEnabled)}
         ${checkbox("默认始终置顶", "alwaysOnTop", settings.alwaysOnTop)}
       </div>
@@ -166,6 +168,8 @@ function instanceCard(instance: NativeInstanceState): string {
         </select></label>
         <label>游走速度<select data-pref="walkSpeedOverride">${speedOptions(instance.settings.walkSpeed)}</select></label>
         ${instanceCheckbox(instance, "resultBubbleEnabledOverride", "结果气泡", instance.settings.resultBubbleEnabled)}
+        ${instanceCheckbox(instance, "soundEnabledOverride", "音效", instance.settings.soundEnabled)}
+        ${instanceCheckbox(instance, "clickThroughEnabledOverride", "点击穿透", instance.settings.clickThroughEnabled)}
         ${instanceCheckbox(instance, "walkEnabledOverride", "启用游走", instance.settings.walkEnabled)}
         ${instanceCheckbox(instance, "alwaysOnTopOverride", "始终置顶", instance.settings.alwaysOnTop)}
       </div>

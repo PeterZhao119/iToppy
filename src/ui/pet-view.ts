@@ -5,6 +5,12 @@ import type {
   CharacterRenderer,
   CharacterRendererFactory,
 } from "../core/characters/renderer.js";
+import {
+  resolveSpriteBBox,
+  unionRects,
+  type HitRect,
+  type SpriteBBoxCache,
+} from "../platform/hit-region.js";
 import { statusIcon } from "./status-icons.js";
 
 type IdleBehavior = "none" | "walk_left" | "walk_right" | "idle_adjust_skirt" | "idle_tail_cuddle";
@@ -56,6 +62,7 @@ export class PetView {
   private walkVelocityY = 0;
   private walkDuration = 0;
   private draggingActive = false;
+  private spriteBBox: SpriteBBoxCache | undefined;
   private runningAnimation: string | undefined;
   private runningActivityKey = "";
   private runningElapsed = 0;
@@ -228,6 +235,48 @@ export class PetView {
   destroy(): void {
     this.renderer.destroy();
     this.element.remove();
+  }
+
+  /**
+   * 窗口坐标（y 向下）下仍需要响应鼠标的区域：
+   * sprite 不透明像素包围盒 + 名字牌 + 可见气泡的并集。
+   */
+  getInteractiveRect(): HitRect | undefined {
+    const canvasWidth = this.canvas.width;
+    const canvasHeight = this.canvas.height;
+    if (this.loaded && canvasWidth > 0 && canvasHeight > 0) {
+      const context = this.canvas.getContext("2d");
+      if (context !== null) {
+        const image = context.getImageData(0, 0, canvasWidth, canvasHeight);
+        this.spriteBBox = resolveSpriteBBox(
+          this.spriteBBox,
+          this.animationKey,
+          image.data,
+          canvasWidth,
+          canvasHeight,
+        );
+      }
+    }
+    const rects: HitRect[] = [];
+    const spriteRect = this.spriteBBox?.rect;
+    if (spriteRect !== undefined) {
+      const bounds = this.canvas.getBoundingClientRect();
+      const scaleX = bounds.width / canvasWidth;
+      const scaleY = bounds.height / canvasHeight;
+      rects.push({
+        x: bounds.left + spriteRect.x * scaleX,
+        y: bounds.top + spriteRect.y * scaleY,
+        w: spriteRect.w * scaleX,
+        h: spriteRect.h * scaleY,
+      });
+    }
+    const nameRect = this.nameTag.getBoundingClientRect();
+    rects.push({ x: nameRect.left, y: nameRect.top, w: nameRect.width, h: nameRect.height });
+    if (this.element.classList.contains("has-bubble")) {
+      const bubbleRect = this.bubbleWrap.getBoundingClientRect();
+      rects.push({ x: bubbleRect.left, y: bubbleRect.top, w: bubbleRect.width, h: bubbleRect.height });
+    }
+    return unionRects(rects);
   }
 
   private render(): void {

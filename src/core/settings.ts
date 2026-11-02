@@ -11,6 +11,8 @@ export interface AgentSettings {
   walkEnabledOverride?: boolean;
   walkSpeedOverride?: WalkSpeed;
   resultBubbleEnabledOverride?: boolean;
+  soundEnabledOverride?: boolean;
+  clickThroughEnabledOverride?: boolean;
   alwaysOnTopOverride?: boolean;
 }
 
@@ -19,6 +21,8 @@ export interface InstancePreferences {
   walkEnabledOverride?: boolean;
   walkSpeedOverride?: WalkSpeed;
   resultBubbleEnabledOverride?: boolean;
+  soundEnabledOverride?: boolean;
+  clickThroughEnabledOverride?: boolean;
   alwaysOnTopOverride?: boolean;
   visible?: boolean;
   monitoringEnabled?: boolean;
@@ -37,6 +41,8 @@ export interface AppSettings {
   walkEnabled: boolean;
   walkSpeed: WalkSpeed;
   resultBubbleEnabled: boolean;
+  soundEnabled: boolean;
+  clickThroughEnabled: boolean;
   alwaysOnTop: boolean;
   autoShowNewTasks: boolean;
   agents: Record<string, AgentSettings>;
@@ -50,6 +56,8 @@ export interface AppSettingsPatch {
   walkEnabled?: boolean;
   walkSpeed?: WalkSpeed;
   resultBubbleEnabled?: boolean;
+  soundEnabled?: boolean;
+  clickThroughEnabled?: boolean;
   alwaysOnTop?: boolean;
   autoShowNewTasks?: boolean;
   agents?: Record<string, AgentSettings>;
@@ -62,6 +70,8 @@ export const defaultAppSettings: AppSettings = {
   walkEnabled: true,
   walkSpeed: "standard",
   resultBubbleEnabled: true,
+  soundEnabled: true,
+  clickThroughEnabled: false,
   alwaysOnTop: true,
   autoShowNewTasks: true,
   agents: {
@@ -83,6 +93,8 @@ export function normalizeSettings(settings: AppSettings): AppSettings {
     walkEnabled: settings.walkEnabled ?? defaultAppSettings.walkEnabled,
     walkSpeed: settings.walkSpeed ?? defaultAppSettings.walkSpeed,
     resultBubbleEnabled: settings.resultBubbleEnabled ?? defaultAppSettings.resultBubbleEnabled,
+    soundEnabled: settings.soundEnabled ?? defaultAppSettings.soundEnabled,
+    clickThroughEnabled: settings.clickThroughEnabled ?? defaultAppSettings.clickThroughEnabled,
     alwaysOnTop: settings.alwaysOnTop ?? defaultAppSettings.alwaysOnTop,
     autoShowNewTasks: settings.autoShowNewTasks ?? defaultAppSettings.autoShowNewTasks,
     agents: { ...defaultAppSettings.agents, ...settings.agents },

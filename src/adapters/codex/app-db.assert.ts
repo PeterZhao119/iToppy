@@ -175,7 +175,7 @@ const failedThread = "01a18722-efe5-7932-a123-a9c4c7a34aea";
   index.applyThreads(rows);
   const instance = index.sourceFor(successThread);
   assert(instance?.instanceId === "codex:/Users/peter/workspace/iToppy", "真实数据：threads 行 → 归一实例（cwd 正确）");
-  assert(instance?.navigation.appBundleId === "com.openai.chat" && instance.displayName.startsWith("Codex App · "), "真实数据：app-server 来源 → Chat 应用宿主");
+  assert(instance?.navigation.appBundleId === "com.openai.codex" && instance.displayName.startsWith("Codex App · "), "真实数据：app-server 来源 → Chat 应用宿主");
   assert(instance?.dataSources.every((source) => source.kind === "database") === true, "真实数据：dataSources 记录 sqlite 来源");
   assert(index.discoveredInstances().length >= 2, "真实数据：多 thread 聚合出去重实例");
 }
@@ -200,7 +200,7 @@ const failedThread = "01a18722-efe5-7932-a123-a9c4c7a34aea";
     { id: "t-weird", cwd: "/ws/weird", source: { type: "app" }, originator: 42 },
   ] as CodexAppThreadRow[]);
   const normal = index.sourceFor("t-normal");
-  assert(normal?.instanceId === "codex:/ws/project" && normal.navigation.appBundleId === "com.openai.chat", "过滤：普通 thread → 归一实例（Chat 应用）");
+  assert(normal?.instanceId === "codex:/ws/project" && normal.navigation.appBundleId === "com.openai.codex", "过滤：普通 thread → 归一实例（Chat 应用）");
   assert(index.sourceFor("t-agent") === undefined, "过滤：agent_path 非空 → 子代理，不建实例");
   assert(index.sourceFor("t-attached") === undefined, "过滤：attached_thread_parent_id 非空 → 派生 thread，不建实例");
   const vscode = index.sourceFor("t-vscode");
@@ -294,7 +294,7 @@ const failedThread = "01a18722-efe5-7932-a123-a9c4c7a34aea";
     instanceId: "codex:/ws/project",
     hostKind: "app",
     displayName: "Codex · project",
-    navigation: { appBundleId: "com.openai.chat", workspacePath: "/ws/project" },
+    navigation: { appBundleId: "com.openai.codex", workspacePath: "/ws/project" },
     dataSources: [],
   };
   const migrated = runtime.register(instance);
